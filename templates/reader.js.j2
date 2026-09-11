@@ -402,17 +402,20 @@
     openToolbar() { document.body.dataset.toolbar = "open"; },
     closeToolbar() { document.body.dataset.toolbar = "closed"; },
 
-    /** 沉浸开关：轻点小圆点 → 切换"只留正文"与"展开工具栏"，
-        同时尝试进入/退出浏览器全屏（隐藏地址栏） */
+    /** 沉浸开关：轻点小圆点，在两种状态之间切换。
+        沉浸 = 收起下方工具栏 + 进浏览器全屏（把地址栏也还给正文）
+        展开 = 显示下方工具栏 + 退出全屏（把浏览器控件还回来，方便操作）
+        两者是同一个状态的两面，必须成对翻转，不能各翻各的。 */
     toggleImmersive() {
-      const expanding = document.body.dataset.toolbar !== "open";
-      document.body.dataset.toolbar = expanding ? "open" : "closed";
-      if (!expanding) this.closeDrawers();
-      this._syncFullscreen(expanding);
+      const toImmersive = document.body.dataset.toolbar === "open";
+      document.body.dataset.toolbar = toImmersive ? "closed" : "open";
+      if (toImmersive) this.closeDrawers();
+      this._syncFullscreen(toImmersive);
       this.awaken();
-      this.toast(expanding ? "工具栏已展开" : "沉浸阅读", 1100);
+      this.toast(toImmersive ? "沉浸阅读 · 全屏" : "已展开工具栏", 1100);
     },
 
+    /** enter=true 进全屏，false 退全屏 */
     _syncFullscreen(enter) {
       const el = document.documentElement;
       try {
@@ -637,7 +640,8 @@
           UI.toggleImmersive(); break;
         case "Escape":
           UI.closeDrawers();
-          if (document.body.dataset.toolbar === "open") UI.closeToolbar();
+          // 收起工具栏即回到沉浸态，全屏一并跟上（不能只收栏不退/进全屏）
+          if (document.body.dataset.toolbar === "open") UI.toggleImmersive();
           break;
       }
     });
@@ -656,11 +660,28 @@
     window.addEventListener("beforeunload", () => Progress.save());
     document.addEventListener("visibilitychange", () => { if (document.hidden) Progress.save(); });
 
-    // 全屏状态外部变化时同步标记
+    /* 全屏状态被系统层面改动时保持两面一致：
+       用户按 Esc 或用手势退出全屏后，把工具栏还回来——
+       否则会停在"既没有全屏、也没有工具栏"的空档里，看着像卡住。 */
     document.addEventListener("fullscreenchange", () => {
-      document.documentElement.classList.toggle("has-fullscreen", !!document.fullscreenElement);
+      if (!document.fullscreenElement && document.body.dataset.toolbar === "closed") {
+        UI.openToolbar();
+        UI.awaken();
+      }
     });
-    document.documentElement.classList.toggle("has-fullscreen", !!document.fullscreenEnabled);
+
+    /* 沉浸态默认就该是全屏，但浏览器要求全屏必须由用户手势触发，
+       所以首次真实交互时补一次；小圆点自带完整切换逻辑，跳过它，
+       免得"进全屏又立刻退全屏"抖一下。 */
+    let immersiveArmed = true;
+    document.addEventListener("pointerdown", (e) => {
+      if (!immersiveArmed) return;
+      if (e.target.closest("#immersiveToggle")) return;
+      immersiveArmed = false;
+      if (document.body.dataset.toolbar === "closed" && !document.fullscreenElement) {
+        UI._syncFullscreen(true);
+      }
+    }, { passive: true });
   }
 
   /* ═══════════════════════════════════════════════════════════
@@ -737,7 +758,7 @@
     // 首次进入给一次圆点提示，让用户知道那里有个开关
     setTimeout(() => {
       UI.awaken();
-      UI.toast("轻点右上圆点可展开工具栏", 2400);
+      UI.toast("轻点右上圆点：沉浸阅读 / 展开工具栏", 2400);
     }, 900);
 
     window.__reader = {

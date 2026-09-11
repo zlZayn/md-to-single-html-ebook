@@ -153,6 +153,54 @@ with sync_playwright() as pw:
     awake = page.evaluate("document.querySelector('#immersiveToggle').classList.contains('is-awake')")
     check("翻页后圆点保持静默", not awake)
 
+    print("\n【8c】沉浸与全屏成对翻转")
+    # 用 spy 记录全屏调用并伪造 fullscreenElement，
+    # 不依赖 headless 是否真的进入全屏（真实全屏行为各环境不一致）
+    page.evaluate("""() => {
+        window.__fs = [];
+        window.__fakeFullscreen = false;
+        Object.defineProperty(document, 'fullscreenElement', {
+            configurable: true,
+            get: () => (window.__fakeFullscreen ? document.documentElement : null),
+        });
+        Element.prototype.requestFullscreen = function () {
+            window.__fs.push('enter'); window.__fakeFullscreen = true;
+            return Promise.resolve();
+        };
+        document.exitFullscreen = function () {
+            window.__fs.push('exit'); window.__fakeFullscreen = false;
+            return Promise.resolve();
+        };
+    }""")
+    page.evaluate("window.__reader.ui.openToolbar()")
+    page.evaluate("window.__fs = []")
+    page.evaluate("window.__reader.ui.toggleImmersive()")     # 展开 -> 沉浸
+    im = page.evaluate("({tb: document.body.dataset.toolbar, fs: window.__fs.slice()})")
+    check("沉浸 = 收起工具栏 + 进全屏",
+          im["tb"] == "closed" and im["fs"] == ["enter"], str(im))
+    page.evaluate("window.__fs = []")
+    page.evaluate("window.__reader.ui.toggleImmersive()")     # 沉浸 -> 展开
+    ex = page.evaluate("({tb: document.body.dataset.toolbar, fs: window.__fs.slice()})")
+    check("展开 = 显示工具栏 + 退全屏",
+          ex["tb"] == "open" and ex["fs"] == ["exit"], str(ex))
+
+    print("\n【8d】沉浸态下首次真实点击补齐全屏")
+    page.reload()                                             # 回到默认沉浸态，清掉 spy
+    page.wait_for_timeout(1500)
+    page.evaluate("""() => {
+        window.__fs = [];
+        Element.prototype.requestFullscreen = function () {
+            window.__fs.push('enter'); return Promise.resolve();
+        };
+    }""")
+    page.mouse.click(W * 0.9, H * 0.5)                        # 真实输入才会产生 pointerdown
+    page.wait_for_timeout(400)
+    fs = page.evaluate("window.__fs.slice()")
+    check("首次点击补进全屏", "enter" in fs, str(fs))
+    check("补全屏时工具栏仍收起",
+          page.evaluate("document.body.dataset.toolbar") == "closed",
+          page.evaluate("document.body.dataset.toolbar"))
+
     print("\n【9】目录跳章仍准确")
     page.evaluate("window.__reader.ui.openDrawer('toc')")
     page.wait_for_timeout(400)

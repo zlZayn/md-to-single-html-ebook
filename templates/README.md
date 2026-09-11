@@ -23,7 +23,7 @@
 | `reader.js.j2` 的 `handleTap` | `verify.py`【4】中轴线分区（中线归属、不弹菜单） |
 | `reader.js.j2` 的分页与测量 | `verify.py`【14】多机型无横向溢出 |
 | `reader.js.j2` 的章节跳转 | `verify.py`【9】目录跳章 |
-| `reader.js.j2` 的圆点与工具栏 | `verify.py`【6】【7】【8】【8b】【12】 |
+| `reader.js.j2` 的圆点与工具栏 | `verify.py`【6】【7】【8】【8b】【8c】【8d】【12】 |
 | `reader.html.j2` 的目录 / 设置结构 | `verify.py`【13】抽屉对齐 |
 | 新增对外可见行为 | 同一次改动内同步 [README.md](../README.md)（怎么用）与 [../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)（设计怎么变） |
 
