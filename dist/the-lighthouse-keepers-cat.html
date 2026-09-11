@@ -1,0 +1,1976 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="day" data-layout="paginated" data-style="book" data-ui="immersive">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#f6f1e7">
+<title>The Lighthouse Keeper&#39;s Cat</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   单文件电子书阅读器 · 样式
+   状态由 <html> 上的 data-* 驱动：
+     data-theme   day | sepia | night
+     data-layout  paginated | scroll
+     data-style   book | modern
+     data-ui      immersive | expanded
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ───────── 主题变量（日间） ───────── */
+:root {
+  --bg:        #f6f1e7;
+  --bg-deep:   #ece4d6;
+  --fg:        #2b2622;
+  --fg-soft:   #6b6157;
+  --fg-faint:  #a09689;
+  --accent:    #a6652f;
+  --accent-sf: #f0e3d1;
+  --line:      #ddd2c0;
+  --panel:     #fffdf9;
+  --shadow:    0 10px 40px rgba(60, 45, 25, .18);
+  --scrim:     rgba(30, 22, 12, .38);
+
+  /* 阅读区度量 */
+  --font-size:   18px;
+  --line-height: 1.85;
+  --page-width:  34rem;
+  --pad-x:       1.35rem;
+  --pad-y:       2.5rem;
+  --font-stack:  Georgia, "Times New Roman", "Songti SC", "Noto Serif SC", serif;
+
+  /* UI 过渡 */
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ui-dur:   .34s;
+}
+
+[data-theme="sepia"] {
+  --bg:        #f3e6cd;
+  --bg-deep:   #e8d7b6;
+  --fg:        #3b2f1f;
+  --fg-soft:   #736048;
+  --fg-faint:  #a89272;
+  --accent:    #8f5a20;
+  --accent-sf: #e9d5b2;
+  --line:      #d6c19c;
+  --panel:     #fbf2e0;
+}
+
+[data-theme="night"] {
+  --bg:        #16181c;
+  --bg-deep:   #0f1114;
+  --fg:        #cbcdd2;
+  --fg-soft:   #8c9099;
+  --fg-faint:  #5e636c;
+  --accent:    #d09a5c;
+  --accent-sf: #2a2620;
+  --line:      #2c3037;
+  --panel:     #1d2026;
+  --shadow:    0 10px 40px rgba(0, 0, 0, .55);
+  --scrim:     rgba(0, 0, 0, .55);
+}
+
+/* ───────── 基础 ───────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-deep);
+  color: var(--fg);
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-family: var(--font-stack);
+  transition: background .28s ease, color .28s ease;
+  /* 禁止浏览器接管横向手势，让翻页跟手更稳定 */
+  overscroll-behavior: none;
+}
+
+[data-fontfamily="sans"] {
+  --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                "Hiragino Sans GB", "Microsoft YaHei", Roboto, sans-serif;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ══════════ 顶部进度条 ══════════ */
+#progressbar {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: transparent;
+  z-index: 60;
+  pointer-events: none;
+  transition: opacity var(--ui-dur) var(--ease-out);
+}
+#progressfill {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  opacity: .55;
+  transition: width .3s ease;
+}
+/* 沉浸模式下进度条淡出，只留极淡一条，不干扰阅读 */
+[data-ui="immersive"] #progressbar { opacity: 0; }
+
+/* ══════════ 阅读区 ══════════ */
+#viewport {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  transition: background .28s ease;
+}
+
+#stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+#book {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  font-size: var(--font-size);
+  line-height: var(--line-height);
+  color: var(--fg);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  /* 英文长文本在窄屏用 auto 断词会产生 some-where 这类难看断点 */
+  hyphens: manual;
+  -webkit-hyphens: manual;
+}
+
+/* ───────── 正文语义 ───────── */
+.chapter-body p {
+  margin: 0 0 1.05em;
+  text-align: justify;
+  hanging-punctuation: first;
+}
+
+.chapter-body h3 {
+  font-size: 1.05em;
+  font-weight: 600;
+  color: var(--fg-soft);
+  margin: 1.8em 0 .8em;
+  letter-spacing: .02em;
+}
+
+.chapter-body blockquote {
+  margin: 1.4em 0;
+  padding: .2em 0 .2em 1.1em;
+  border-left: 3px solid var(--line);
+  color: var(--fg-soft);
+  font-style: italic;
+}
+
+.chapter-body em { font-style: italic; }
+.chapter-body strong { font-weight: 600; }
+
+.chapter-body hr {
+  border: 0;
+  margin: 1.8em auto;
+  width: 38%;
+  height: 0;
+  border-top: 1px solid var(--line);
+  position: relative;
+}
+
+.chapter-body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .88em;
+  background: var(--accent-sf);
+  padding: .1em .35em;
+  border-radius: .25em;
+}
+
+/* 章节头 */
+.chapter-head {
+  text-align: center;
+  margin: 0 0 1.8em;
+}
+.chapter-num {
+  display: block;
+  font-size: .72em;
+  letter-spacing: .38em;
+  text-indent: .38em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  margin-bottom: .7em;
+}
+.chapter-title {
+  font-size: 1.42em;
+  font-weight: 600;
+  line-height: 1.35;
+  margin: 0;
+  letter-spacing: .005em;
+}
+
+/* 书末页 */
+.book-end {
+  text-align: center;
+  margin: 3em 0 4em;
+  color: var(--fg-faint);
+}
+.end-mark { font-size: 1.6em; margin: 0 0 .6em; color: var(--accent); }
+.end-text { margin: 0 0 .4em; font-size: .95em; }
+.end-hint { margin: 0; font-size: .78em; letter-spacing: .04em; }
+
+/* ───────── 排版风格：书籍感 ───────── */
+[data-style="book"] .chapter-body p { text-indent: 1.6em; }
+[data-style="book"] .chapter-body > p:first-of-type { text-indent: 0; }
+[data-style="book"] .chapter-body > p:first-of-type::first-letter {
+  float: left;
+  font-size: 3.05em;
+  line-height: .84;
+  padding: .04em .09em 0 0;
+  font-weight: 600;
+  color: var(--accent);
+}
+[data-style="book"] .chapter-body blockquote p { text-indent: 0; }
+[data-style="book"] .chapter-title { font-style: italic; font-weight: 500; }
+
+/* ───────── 排版风格：现代 ───────── */
+[data-style="modern"] .chapter-body p {
+  text-indent: 0;
+  text-align: left;
+  margin-bottom: 1.35em;
+}
+[data-style="modern"] .chapter-head {
+  text-align: left;
+  margin-bottom: 2.2em;
+  padding-bottom: 1em;
+  border-bottom: 1px solid var(--line);
+}
+[data-style="modern"] .chapter-num {
+  text-align: left;
+  letter-spacing: .22em;
+  margin-bottom: .55em;
+}
+[data-style="modern"] .chapter-title {
+  font-size: 1.55em;
+  letter-spacing: -0.01em;
+}
+[data-style="modern"] .chapter-body > p:first-of-type::first-letter {
+  float: none;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* ══════════ 分页模式（CSS 多列） ══════════ */
+/* 三个硬约束（来自 epub.js / 起点阅读页的成熟实践）：
+   1. column-width 必须用绝对长度 —— 百分比对它是非法值，会被浏览器直接丢弃；
+   2. 容器必须同时固定宽与高，「宽高完美限制」才能形成一列一页；
+   3. overflow:hidden 只能放父层 #stage，绝不能加到多列容器 #book 上 ——
+      Chrome 55+ 对「overflow 非 visible 的多列容器」有渲染 bug，
+      会导致第 3 栏之后的分栏整片不显示。 */
+[data-layout="paginated"] #stage {
+  padding: var(--pad-y) var(--pad-x);
+}
+
+[data-layout="paginated"] #book {
+  /* 兜底值，真实宽度由 Paginator 实测后写入 --col-w */
+  column-width: var(--col-w, 20rem);
+  column-gap: calc(var(--pad-x) * 2);
+  column-fill: auto;
+  height: 100%;
+  padding: 0;
+  /* 翻页位移。过渡曲线收尾要"稳"：起步略快、末段缓慢收敛，
+     不要用回弹感强的曲线，否则连续翻页会显得飘。 */
+  transform: translate3d(0, 0, 0);
+  transition: transform .38s var(--ease-out);
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* 翻页光影：点击左右侧时从对应方向扫过一道极淡的渐变，
+   在没有拖拽跟手的情况下提供方向反馈。 */
+#pagehint {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .4s ease;
+}
+#pagehint[data-dir="next"] {
+  background: linear-gradient(to left, rgba(0, 0, 0, .09), transparent 46%);
+}
+#pagehint[data-dir="prev"] {
+  background: linear-gradient(to right, rgba(0, 0, 0, .09), transparent 46%);
+}
+#pagehint.is-on { opacity: 1; }
+[data-theme="night"] #pagehint[data-dir="next"] {
+  background: linear-gradient(to left, rgba(255, 255, 255, .07), transparent 46%);
+}
+[data-theme="night"] #pagehint[data-dir="prev"] {
+  background: linear-gradient(to right, rgba(255, 255, 255, .07), transparent 46%);
+}
+[data-layout="scroll"] #pagehint { display: none; }
+
+/* 相邻页之间的装订线 */
+[data-layout="paginated"] #stage::before {
+  content: "";
+  position: absolute;
+  top: 8%;
+  bottom: 8%;
+  left: 50%;
+  width: 1px;
+  background: linear-gradient(to bottom,
+    transparent, var(--line) 18%, var(--line) 82%, transparent);
+  opacity: .45;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* 大屏限宽居中：通过 #stage 的 max-width 实现，
+   这样 #book 依然是 #stage 全宽，translate 步长计算保持简单可靠 */
+@media (min-width: 48rem) {
+  [data-layout="paginated"] #stage {
+    max-width: calc(var(--page-width) + var(--pad-x) * 2);
+    margin: 0 auto;
+  }
+}
+
+/* ══════════ 滚动模式 ══════════ */
+[data-layout="scroll"] #stage { overflow: hidden; }
+
+[data-layout="scroll"] #book {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--pad-y) var(--pad-x) 6rem;
+  transform: none !important;
+  transition: none;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+[data-layout="scroll"] .chapter {
+  max-width: var(--page-width);
+  margin: 0 auto;
+  padding-bottom: 2.5rem;
+}
+[data-layout="scroll"] #stage::before { display: none; }
+[data-layout="scroll"] .book-end { max-width: var(--page-width); margin-inline: auto; }
+
+/* ══════════ 页码 ══════════ */
+#pageinfo {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom) + .6rem);
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: .72rem;
+  letter-spacing: .14em;
+  color: var(--fg-faint);
+  pointer-events: none;
+  z-index: 6;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  transition: opacity var(--ui-dur) var(--ease-out), transform var(--ui-dur) var(--ease-out);
+  font-variant-numeric: tabular-nums;
+}
+/* 展开工具栏时页码上移让位；沉浸时淡出 */
+[data-ui="immersive"] #pageinfo { opacity: .32; }
+body[data-toolbar="open"] #pageinfo { transform: translateY(-3.6rem); opacity: 1; }
+[data-layout="scroll"] #pageinfo { display: none; }
+
+/* ══════════ 沉浸开关（唯一常驻控件 · 右上角） ══════════ */
+#immersiveToggle {
+  position: fixed;
+  right: calc(env(safe-area-inset-right) + 1rem);
+  top: calc(env(safe-area-inset-top) + 1rem);
+  width: 2.6rem;
+  height: 2.6rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  z-index: 55;
+  /* 极淡：平时几乎看不见，不干扰阅读 */
+  opacity: .18;
+  background: transparent;
+  transition: opacity .3s var(--ease-out), transform .3s var(--ease-out),
+              background .3s var(--ease-out);
+  touch-action: none;
+}
+/* 圆点本体 */
+#immersiveToggle .dot-core {
+  width: .5rem;
+  height: .5rem;
+  border-radius: 50%;
+  background: var(--fg-soft);
+  transition: all .3s var(--ease-out);
+}
+/* 悬停 / 按键反馈（桌面端） */
+@media (hover: hover) {
+  #immersiveToggle:hover { opacity: .6; }
+}
+/* 按下时明确反馈 */
+#immersiveToggle.is-pressing { opacity: .85; transform: scale(.88); }
+/* 展开状态下圆点变成更明显的一枚小胶囊，提示"可收起" */
+body[data-toolbar="open"] #immersiveToggle { opacity: .5; }
+body[data-toolbar="open"] #immersiveToggle .dot-core {
+  width: 1rem;
+  height: .28rem;
+  border-radius: .2rem;
+}
+/* 阅读中有互动时短暂提高可见度，随后自动回落（由 JS 控制 class） */
+#immersiveToggle.is-awake { opacity: .55; }
+
+/* 防止小圆点挡住内容：小屏时贴近边缘 */
+@media (max-width: 480px) {
+  #immersiveToggle { right: calc(env(safe-area-inset-right) + .75rem); }
+}
+
+/* ══════════ 底部工具栏 ══════════ */
+#toolbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3.2rem;
+  padding: .5rem 1rem calc(env(safe-area-inset-bottom) + .5rem);
+  background: color-mix(in srgb, var(--panel) 90%, transparent);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-top: 1px solid var(--line);
+  transform: translateY(0);
+  transition: transform var(--ui-dur) var(--ease-out), opacity var(--ui-dur) var(--ease-out);
+}
+body[data-toolbar="closed"] #toolbar {
+  transform: translateY(120%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tb-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .12rem;
+  min-width: 3.6rem;
+  padding: .32rem .45rem;
+  border-radius: .6rem;
+  font-size: .66rem;
+  letter-spacing: .02em;
+  color: var(--fg-soft);
+  transition: background .18s, color .18s;
+}
+.tb-btn svg {
+  width: 1.3rem;
+  height: 1.3rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.tb-btn:active { background: var(--accent-sf); color: var(--accent); }
+
+/* ══════════ 抽屉 ══════════ */
+.drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: min(20rem, 86vw);
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  transition: transform .38s var(--ease-out);
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  will-change: transform;
+}
+.drawer-left  { left: 0;  transform: translateX(-102%); }
+.drawer-right { right: 0; transform: translateX(102%); }
+.drawer.is-open { transform: translateX(0); }
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.1rem .8rem;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.drawer-head h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+.drawer-close {
+  font-size: 1.5rem;
+  line-height: 1;
+  width: 2rem; height: 2rem;
+  display: grid; place-items: center;
+  border-radius: .5rem;
+  color: var(--fg-faint);
+}
+.drawer-close:active { background: var(--accent-sf); }
+
+.drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 1rem 1.1rem 3rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+}
+
+/* ══════════ 目录 ══════════ */
+.toc-meta {
+  padding-bottom: .85rem;
+  margin-bottom: .35rem;
+  border-bottom: 1px solid var(--line);
+}
+.toc-book {
+  margin: 0 0 .3rem;
+  font-size: .95rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.toc-author { margin: 0 0 .35rem; font-size: .8rem; color: var(--fg-soft); }
+.toc-stat {
+  margin: 0;
+  font-size: .72rem;
+  line-height: 1.4;
+  color: var(--fg-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 序号列定宽右对齐 + 标题列左对齐成栅格：
+   两位数序号不会把标题顶歪，长标题换行后悬挂对齐在标题列 */
+.toc-list { display: flex; flex-direction: column; }
+.toc-item {
+  display: grid;
+  grid-template-columns: 1.5rem 1fr;
+  align-items: baseline;
+  gap: .7rem;
+  width: 100%;
+  min-height: 2.6rem;
+  padding: .58rem .6rem;
+  text-align: left;
+  border-radius: .5rem;
+  font-size: .85rem;
+  line-height: 1.45;
+  color: var(--fg-soft);
+  transition: background .18s, color .18s;
+}
+.toc-item:active { background: var(--accent-sf); }
+.toc-item.is-current {
+  background: var(--accent-sf);
+  color: var(--accent);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.toc-num {
+  font-size: .7rem;
+  color: var(--fg-faint);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.toc-item.is-current .toc-num { color: var(--accent); }
+
+/* ══════════ 设置项 ══════════ */
+/* 标签列定宽 + 控件列自适应：每行左边缘与控件左边缘都落在同一条栅格线上 */
+.set-group {
+  display: grid;
+  grid-template-columns: 4.2rem 1fr;
+  align-items: center;
+  gap: .4rem .7rem;
+  padding: .7rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.set-group:last-of-type { border-bottom: 0; }
+.set-group h4 {
+  margin: 0;
+  font-size: .76rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--fg-soft);
+}
+.set-hint {
+  display: block;
+  margin-top: .1rem;
+  font-size: .68rem;
+  color: var(--fg-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.seg {
+  display: flex;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: .62rem;
+  padding: 3px;
+  gap: 3px;
+}
+.seg-btn {
+  flex: 1;
+  padding: .48rem .3rem;
+  border-radius: .45rem;
+  font-size: .79rem;
+  color: var(--fg-soft);
+  transition: background .18s, color .18s, box-shadow .18s;
+  white-space: nowrap;
+}
+.seg-btn.is-active {
+  background: var(--panel);
+  color: var(--accent);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .1);
+}
+[data-theme="night"] .seg-btn.is-active { background: #2b3038; box-shadow: none; }
+
+.seg-theme .seg-btn { font-size: .76rem; }
+.seg-theme .theme-day   { background: #fbf8f2; color: #2b2622; }
+.seg-theme .theme-sepia { background: #f3e6cd; color: #3b2f1f; }
+.seg-theme .theme-night { background: #22252b; color: #cbcdd2; }
+.seg-theme .seg-btn.is-active { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.stepper { display: flex; align-items: center; gap: .7rem; }
+.step-btn {
+  flex: none;
+  min-width: 2.9rem;
+  padding: .48rem .5rem;
+  border: 1px solid var(--line);
+  border-radius: .55rem;
+  font-size: .82rem;
+  text-align: center;
+  transition: background .18s, color .18s;
+}
+.step-btn.step-big { font-size: 1rem; }
+.step-btn:active { background: var(--accent-sf); color: var(--accent); }
+.step-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--line);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.step-bar span {
+  display: block;
+  height: 100%;
+  width: 50%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width .2s ease;
+}
+
+.set-version {
+  margin: 1.4rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+  font-size: .7rem;
+  line-height: 1.6;
+  color: var(--fg-faint);
+  text-align: center;
+}
+
+/* ══════════ 遮罩 ══════════ */
+#scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  background: var(--scrim);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .32s var(--ease-out);
+}
+body[data-drawer="open"] #scrim { opacity: 1; pointer-events: auto; }
+
+/* ══════════ 轻提示 ══════════ */
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 5rem);
+  z-index: 100;
+  transform: translate(-50%, .8rem);
+  padding: .62rem 1.05rem;
+  background: color-mix(in srgb, var(--fg) 90%, transparent);
+  color: var(--bg);
+  border-radius: 2rem;
+  font-size: .8rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .24s ease, transform .24s ease;
+  max-width: 82vw;
+  text-align: center;
+  backdrop-filter: blur(8px);
+}
+#toast.is-open { opacity: 1; transform: translate(-50%, 0); }
+
+/* ══════════ 大屏适配 ══════════ */
+@media (min-width: 48rem) {
+  :root { --pad-x: 3.5rem; --pad-y: 3.5rem; }
+  [data-layout="scroll"] #stage { max-width: 62rem; margin: 0 auto; }
+  .drawer { width: 22rem; }
+}
+
+/* 横屏：压缩纵向留白 */
+@media (orientation: landscape) and (max-height: 30rem) {
+  :root { --pad-y: 1.1rem; }
+  .chapter-head { margin-bottom: 1rem; }
+}
+
+/* ══════════ 打印 ══════════ */
+@media print {
+  html, body { overflow: visible; background: #fff; color: #000; }
+  #progressbar, #toolbar, #pageinfo, .drawer, #scrim,
+  #toast, #immersiveToggle { display: none !important; }
+  #viewport { position: static; display: block; }
+  #stage { height: auto; overflow: visible; }
+  #book { height: auto; transform: none !important; padding: 0; }
+  .chapter { break-before: page; }
+}
+
+/* ══════════ 减少动效偏好 ══════════ */
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
+
+</style>
+</head>
+<body>
+
+<!-- 顶部进度条：沉浸模式下淡出 -->
+<div id="progressbar" role="progressbar" aria-label="阅读进度"><span id="progressfill"></span></div>
+
+<!-- ══════════ 阅读区 ══════════ -->
+<main id="viewport" aria-label="正文">
+  <div id="stage">
+    <article id="book">
+      <section class="chapter" id="ch-1" data-index="0">
+        <header class="chapter-head">
+          <span class="chapter-num">1</span>
+          <h2 class="chapter-title">Chapter One: The Old Man and the Light</h2>
+        </header>
+        <div class="chapter-body">
+<p>Old Tom lived in a lighthouse at the edge of the world.</p>
+<p>He had lived there for forty years. He was the keeper. His job was simple, and it was the same every day: he kept the light burning. When the sun went down, he climbed the stairs. There were one hundred and twelve steps, and he knew every one of them by heart — which ones creaked, which ones were soft, which one had a small crack that whistled when the wind was strong.</p>
+<p>At the top, he turned on the light. It went round and round, a long slow arm of brightness sweeping across the dark water. Ships far out at sea saw it and knew where the land was. Some of them came close. Some of them passed in the night, and the men aboard looked up and felt a little safer, and never knew the old man's name.</p>
+<p>Tom did not mind. He had never wanted to be known.</p>
+<p>He had one friend. Her name was Mia. Mia was a black cat with green eyes and one small white spot on her chest. She had come to the lighthouse eleven years ago, in a storm much like the one Tom would remember for the rest of his life. She had been a thin, wet, angry thing then, all bones and hisses. Tom had opened the door, and she had walked in like she owned the place, and somehow, without either of them saying a word about it, she had never left.</p>
+<p>Mia followed him up the stairs every night. She did not climb the way a cat usually climbs stairs. She climbed the way a queen walks through a room she owns — slowly, with her tail up, pausing to look at things that did not need looking at. When Tom reached the top and turned on the light, Mia sat by the window. She watched the sea.</p>
+<p>Tom never knew what she saw. He liked to think she was counting the waves.</p>
+<p>The two of them lived a small, quiet life. Tom cooked. Mia supervised. Tom read old books with cracked spines. Mia slept on the books, which Tom said was a form of editing. In the winter, the wind howled around the lighthouse like something hungry, and Tom fed the small iron stove, and Mia curled up by the fire, and the world outside was cold and huge and very far away.</p>
+<p>It was a good life. Tom was not sure when he had begun to think of it that way, but somewhere along the years, he had.</p>
+<p>He was seventy-three years old now. His hands were steady, but his knees hurt. Some mornings he stood at the bottom of the stairs and looked up, and the stairs looked longer than they had when he was thirty. But he always climbed them. Every night, without fail. The light had never gone out. Not once in forty years.</p>
+<p>That, he thought, was the one thing he could say about his life. The light had never gone out.</p>
+<hr />
+
+        </div>
+      </section>
+      <section class="chapter" id="ch-2" data-index="1">
+        <header class="chapter-head">
+          <span class="chapter-num">2</span>
+          <h2 class="chapter-title">Chapter Two: The Storm</h2>
+        </header>
+        <div class="chapter-body">
+<p>The storm came in September.</p>
+<p>It did not come slowly, the way some storms do, giving you time to close the windows and bring in the washing. It came like a fist. One moment the sea was grey and calm, and the next it was white and screaming, and the sky was the color of an old bruise.</p>
+<p>Tom had seen many storms. He was not afraid of storms. But when he looked out the window that evening, something in his chest went cold.</p>
+<p>This one was different. This one was angry.</p>
+<p>The wind hit the lighthouse and the whole building seemed to lean. The windows rattled in their frames. A shutter tore loose from the outside wall and flew away into the dark, and Tom heard it go, but he did not hear it land.</p>
+<p>Mia stood on the table with her back arched high, her fur standing up all along her spine. She was staring at the window. She was not afraid, either. But she did not like it.</p>
+<p>&quot;I know,&quot; Tom said to her. &quot;I don't like it much myself.&quot;</p>
+<p>He climbed the stairs. It took longer than usual. The wind pushed against the tower, and twice he had to stop and hold the rail. At the top, he turned on the light. It began its slow circle, and the beam cut through the rain and the spray, and for a moment the world was only that: the light, and the dark, and the water trying to reach them.</p>
+<p>Then the radio died.</p>
+<p>Tom heard the crackle and then the silence, and he stood very still. He picked up the receiver. He turned the dial. Nothing. Just the flat, dead hum of no signal at all.</p>
+<p>He tried the phone. Dead.</p>
+<p>The storm had broken everything. The wind had taken the antenna, or the water had found the wires, or the whole thing had simply decided, after forty years, that it was tired. It did not matter why. What mattered was that Tom was alone on a rock in the middle of a black and furious sea, with no way to call for help.</p>
+<p>He went back down the stairs slowly. He sat in his chair by the stove. He looked at the fire.</p>
+<p>Mia came and sat on his lap. She put her small warm weight on his knees and looked up at him.</p>
+<p>&quot;There's a boat out there,&quot; Tom said quietly. &quot;I saw it two hours ago. Small one. Heading this way.&quot;</p>
+<p>He had seen it in the dim grey light before the storm fully took hold: a small fishing boat, low in the water, moving slowly, too far from shore to reach any port before the weather turned. He had thought about it all evening. He had hoped it had turned back.</p>
+<p>He looked at the window. The rain was hitting it sideways, hard enough to sound like gravel.</p>
+<p>&quot;If they're out there,&quot; Tom said, &quot;they're in trouble. And I can't call anyone. And nobody can hear us.&quot;</p>
+<p>Mia blinked at him. Cats do not understand words, but they understand the shape of a voice. Tom's voice had a shape she did not like.</p>
+<p>&quot;I've kept the light on for forty years,&quot; Tom said. &quot;And now a night comes when it isn't enough.&quot;</p>
+<p>They sat there together for a long time. The stove crackled. The wind screamed. The light went round and round above them, patient, useless, faithful.</p>
+<p>Then Mia jumped off his lap.</p>
+<hr />
+
+        </div>
+      </section>
+      <section class="chapter" id="ch-3" data-index="2">
+        <header class="chapter-head">
+          <span class="chapter-num">3</span>
+          <h2 class="chapter-title">Chapter Three: The Box</h2>
+        </header>
+        <div class="chapter-body">
+<p>Mia walked to the corner of the room.</p>
+<p>There was a low shelf there, and on the shelf was a wooden box, dark with age, closed with a small brass hook. Tom had not opened it in years. It was full of things from a time before the lighthouse, from a time when he had been a young man with a young wife and a small boat of his own, and the sea had been a promise instead of a memory.</p>
+<p>Mia sat down in front of the box. She looked at Tom.</p>
+<p>&quot;What?&quot; Tom said.</p>
+<p>Mia looked at the box again. Then she reached up with one paw and pushed it.</p>
+<p>The box slid off the shelf and hit the floor with a crack. The old brass hook snapped, and the lid fell open, and out onto the floor came a tangle of things: a folded map, a length of rope, a small tin of buttons, a photograph curled at the edges, and a flag.</p>
+<p>Tom stared at the flag.</p>
+<p>It was red and white, square, and old. It had been his father's, and his father's before that. It was the flag that meant <em>come here, we need help</em>, and it had been used by sailors long before radios existed, and Tom had not thought about it in forty years.</p>
+<p>Mia sat beside it. She looked up at him with her green eyes, and Tom could have sworn she was waiting.</p>
+<p>He picked up the flag. His hands were shaking, and he did not know if it was age or the wind or something else.</p>
+<p>&quot;Nobody's going to see this,&quot; he said.</p>
+<p>Mia did not answer. She never did.</p>
+<hr />
+
+        </div>
+      </section>
+      <section class="chapter" id="ch-4" data-index="3">
+        <header class="chapter-head">
+          <span class="chapter-num">4</span>
+          <h2 class="chapter-title">Chapter Four: The Climb</h2>
+        </header>
+        <div class="chapter-body">
+<p>Tom climbed the stairs.</p>
+<p>It was the hardest climb of his life. The wind came through the walls now, thin cold blades of it, and twice he had to stop and press himself against the stone and breathe. His knees hurt. His chest hurt. He held the flag against his body with one arm, and he pulled himself up with the other.</p>
+<p>Mia climbed behind him. She stayed close. When he stopped, she stopped. When he started again, she started again. She did not run ahead, the way she had for eleven years. That night, she walked beside him all the way to the top.</p>
+<p>One hundred and twelve steps. He counted every one.</p>
+<p>At the top, the light was still turning. It was the only steady thing in the world. Beyond the glass, the sea was a chaos of black water and white foam, and the rain flew past the window in long horizontal lines, and the wind made a sound like a train that never arrived.</p>
+<p>Tom opened the small window on the seaward side. The wind slammed it back against the wall and water hit his face like a slap. He held onto the frame with one hand and raised the flag with the other.</p>
+<p>And then he stood there and waved it.</p>
+<p>The wind tore at the cloth. The flag snapped and twisted, red and white and red, and the rain soaked it through until it was heavy and dark. Tom's arms ached. Tom's legs shook. Twice he nearly fell. Twice he caught himself.</p>
+<p>He waved the flag.</p>
+<p>Mia sat by the window and watched the sea. Her tail was wrapped around her paws. The light went round and round above them.</p>
+<p>&quot;How long?&quot; Tom said through his teeth. &quot;How long do I do this?&quot;</p>
+<p>Mia watched the sea.</p>
+<p>So Tom kept waving.</p>
+<hr />
+
+        </div>
+      </section>
+      <section class="chapter" id="ch-5" data-index="4">
+        <header class="chapter-head">
+          <span class="chapter-num">5</span>
+          <h2 class="chapter-title">Chapter Five: The Ship</h2>
+        </header>
+        <div class="chapter-body">
+<p>Out on the water, in the dark, a ship was fighting for its life.</p>
+<p>She was the <em>Marigold</em>, a cargo ship three days out of a northern port, and she had not expected the storm either. Her captain was a woman named Elena Ford, and she had been at sea for twenty years, and she had never seen weather turn so fast. The waves were as tall as houses. The old ship groaned and rolled, and every man aboard held onto something and said nothing, because there was nothing to say.</p>
+<p>The radio was down. The radar was down. The <em>Marigold</em> was limping south along a coast she could not see, and Elena knew — with the flat certainty of a sailor who has done this too long to lie to herself — that if she could not find the coastline soon, she would find the rocks instead.</p>
+<p>She stood in the wheelhouse with her hands on the wheel and her eyes on a world of grey and black, and she thought about her daughter, and then she made herself stop thinking about her daughter.</p>
+<p>And then she saw the light.</p>
+<p>It appeared to the west, low, sweeping, gone, back again. A long slow arm of brightness across the water. She knew that light. Every sailor on that coast knew that light. It was the old lighthouse, the one at the edge of the world, the one that never went out.</p>
+<p>Elena turned the wheel. She pointed the <em>Marigold</em> at the light, and she felt her own shoulders drop an inch, because now she knew where she was, and knowing where you are is most of what it takes to survive.</p>
+<p>She was halfway there when she saw the flag.</p>
+<p>It was small, and red and white, and it was moving in the window at the top of the tower, and for a moment Elena did not understand what she was looking at. Then she did. It was the old signal. The one nobody used anymore.</p>
+<p><em>Help. Come here.</em></p>
+<p>But the lighthouse was on land. The lighthouse was safe. Why would a man in a lighthouse wave for help?</p>
+<p>And then Elena understood the second thing, and her blood went cold.</p>
+<p>He was not waving for himself.</p>
+<p>She looked past the lighthouse, and in the flashes of the sweeping light she saw it: a small dark shape, far out, rolling in the trough of a wave, coming up, going down. A small boat. A fishing boat.</p>
+<hr />
+
+        </div>
+      </section>
+      <section class="chapter" id="ch-6" data-index="5">
+        <header class="chapter-head">
+          <span class="chapter-num">6</span>
+          <h2 class="chapter-title">Chapter Six: The Rescue</h2>
+        </header>
+        <div class="chapter-body">
+<p>It took Elena two hours to do what she did next, and she would tell the story for the rest of her life, and she would always say the same thing: that it was the light that did it, and the flag, and a stubborn old man she never met.</p>
+<p>She could not go close to the rocks — the <em>Marigold</em> was too big, and the water too wild. So she brought her ship in as near as she dared, and she turned so that her own deck lights faced the open water, and she waited for the small boat to see her.</p>
+<p>Then she took a line, and a life ring, and she and two of her crew did something that no captain should ever order and no sailor should ever have to do: they lowered a boat of their own into the sea.</p>
+<p>The waves threw them around like a toy. Twice the small boat almost overturned. But the men in the fishing boat saw the lights. They understood. One of them — the youngest, a boy of nineteen — jumped into the freezing water with a rope tied around his waist, and he swam, and he swam, and he reached the life ring, and they pulled him in.</p>
+<p>Then they went back for the other two. It took four tries. On the third, a wave put the two boats on top of each other, and one man broke his arm. On the fourth, they got them both.</p>
+<p>It took three hours in total. By the end, everyone was alive. Nobody could quite believe it.</p>
+<p>And all through it, the light kept turning.</p>
+<p>And all through it, in the window at the top of the tower, an old man held a piece of wet cloth in the air and did not let it fall.</p>
+<hr />
+
+        </div>
+      </section>
+      <section class="chapter" id="ch-7" data-index="6">
+        <header class="chapter-head">
+          <span class="chapter-num">7</span>
+          <h2 class="chapter-title">Chapter Seven: Morning</h2>
+        </header>
+        <div class="chapter-body">
+<p>The storm was gone by morning.</p>
+<p>It went the way it came: suddenly, and without apology. One moment the sea was a wall of white, and the next it was flat and grey and quiet, and the sky was pale and clean, and the sun came up out of the water like something being born.</p>
+<p>Tom did not remember the end of the night. He remembered the light going round. He remembered his arms. He remembered sitting down on the floor at some point, with his back against the wall and the flag in his lap, and Mia pressed against his leg, warm and purring. He remembered thinking, very clearly, <em>I am too old for this</em>, and then, immediately after, <em>but not too old for that</em>.</p>
+<p>He woke up on the floor of the light room with the sun in his eyes.</p>
+<p>Below, in the water, he could see a ship.</p>
+<p>It was anchored a little way off, a big grey cargo ship, and a small boat was coming toward the lighthouse, rising and falling on the calm morning swell. Tom stood up slowly. His knees complained. He went down the stairs, one hundred and twelve steps, holding the rail with both hands.</p>
+<p>Mia followed him. She walked slowly, like a queen again.</p>
+<p>On the rock, three men were waiting. There was an old man with a bandaged arm, and a young man, and a third man who was crying quietly and did not seem to care who saw. Behind them, standing a little apart, was a woman in a dark coat.</p>
+<p>Tom opened the door.</p>
+<p>For a moment, nobody said anything. The sea made its small sounds. The men looked at the old man in the doorway, at his white hair and his shaking hands, and they did not know what to say, because there are things you cannot say.</p>
+<p>Then the young man said, &quot;You waved the flag.&quot;</p>
+<p>&quot;I did,&quot; said Tom.</p>
+<p>&quot;How did you know we were out there?&quot;</p>
+<p>&quot;Cat saw the boat.&quot;</p>
+<p>The young man looked down. Mia was sitting in the doorway, in the sun, washing her paw. She looked up at him once, with her green eyes. Then she went back to washing her paw.</p>
+<p>The woman in the dark coat walked forward. She held out her hand, and Tom shook it. Her grip was very strong.</p>
+<p>&quot;Elena Ford,&quot; she said. &quot;Captain of the <em>Marigold</em>. I saw your light, and then I saw your flag. Without it I'd have taken my ship onto the rocks and I'd have missed your boat entirely. You saved three men and you saved my ship. I don't know how to say that properly.&quot;</p>
+<p>&quot;You just did,&quot; Tom said.</p>
+<p>She looked at him for a long moment. Then she looked at Mia.</p>
+<p>&quot;And the cat,&quot; she said.</p>
+<p>&quot;And the cat,&quot; Tom agreed.</p>
+<hr />
+
+        </div>
+      </section>
+      <section class="chapter" id="ch-8" data-index="7">
+        <header class="chapter-head">
+          <span class="chapter-num">8</span>
+          <h2 class="chapter-title">Chapter Eight: The Light</h2>
+        </header>
+        <div class="chapter-body">
+<p>They stayed for the morning.</p>
+<p>Elena helped Tom fix the antenna. The young man — his name was Peter — climbed the stairs with him, one hundred and twelve steps, and did not complain once, and at the top he looked out at the sea for a long time and said, &quot;I've never seen anything like this.&quot;</p>
+<p>&quot;It's just water,&quot; Tom said.</p>
+<p>&quot;It's not,&quot; said Peter.</p>
+<p>The old man with the bandaged arm fell asleep in Tom's chair. The crying man stopped crying and helped Tom cook, and they made a large, bad, wonderful breakfast out of whatever was in the cupboard, and everyone ate it and everyone said it was good, which was a lie, and which was also the truth.</p>
+<p>Elena asked Tom how long he had been the keeper.</p>
+<p>&quot;Forty years,&quot; Tom said.</p>
+<p>&quot;And nothing's ever gone wrong?&quot;</p>
+<p>&quot;Nothing that mattered.&quot;</p>
+<p>She looked at the light. It was off now, in the daylight, but she could see it, the great lens, the gears, the patient machine that turned all night and slept all day.</p>
+<p>&quot;That light's saved a lot of people,&quot; she said.</p>
+<p>&quot;That's the job,&quot; said Tom.</p>
+<p>&quot;That's not a job,&quot; said Elena. &quot;That's a life.&quot;</p>
+<p>In the evening, the <em>Marigold</em> was ready to sail. The small boat was aboard. The three men were aboard. Elena stood at the rail and looked back at the lighthouse, and Tom stood on the rock and looked out at the ship, and neither of them waved, because they were not those kinds of people.</p>
+<p>Mia sat on a stone and watched the ship leave.</p>
+<p>Then, when the ship was small and far away, she got up and walked to the door and went inside, and Tom followed her, and they climbed the stairs together, one hundred and twelve steps, the way they had every night for eleven years.</p>
+<p>At the top, Tom turned on the light.</p>
+<p>It went round and round.</p>
+<hr />
+
+        </div>
+      </section>
+      <section class="chapter" id="ch-9" data-index="8">
+        <header class="chapter-head">
+          <span class="chapter-num">9</span>
+          <h2 class="chapter-title">Chapter Nine: The Letter</h2>
+        </header>
+        <div class="chapter-body">
+<p>Three weeks later, a letter came.</p>
+<p>It came by boat, because there was no other way for a letter to come to a lighthouse at the edge of the world. A supply boat brought it, along with flour and oil and a new radio antenna, and the man on the boat said, &quot;You're Tom, right? This is for you,&quot; and handed him a thick envelope with a foreign stamp.</p>
+<p>Tom opened it that evening, by the stove, with Mia on his lap.</p>
+<p>Inside was a letter, handwritten, and a photograph, and something else.</p>
+<p>The letter said:</p>
+<blockquote>
+<p><em>Dear Mr. Tom,</em></p>
+<p><em>I don't know your last name, and I don't know if you want to be written to, and I am not sure this letter will even reach you. But I have thought about that night every day since, and I have to say it.</em></p>
+<p><em>The men you saved are all well. The man with the broken arm is back at sea. The young one, Peter, has decided to become a sailor properly, which his mother is not happy about, and which I have told her is a good thing and she does not believe me.</em></p>
+<p><em>I have sailed that coast for twenty years, and I thought I knew it. I did not know it. I did not know there was an old man up there who would stand in a storm with a piece of cloth because he thought someone might be drowning.</em></p>
+<p><em>My daughter asks me to tell you that you are her hero. She is nine. She has decided that she is going to be a lighthouse keeper, which is a strange job for a nine-year-old girl to want, and I have not discouraged her.</em></p>
+<p><em>I enclose a photograph of the crew of the Marigold. We took it the morning we left. We all looked terrible. We kept it anyway.</em></p>
+<p><em>And I enclose something else. It is not a gift exactly. It is a flag. It is old and red and white, like yours. My father had one on his boat when I was a girl, and I always thought it meant &quot;help.&quot; He told me it could also mean &quot;we are here.&quot;</em></p>
+<p><em>I looked it up. He was right.</em></p>
+<p><em>So. Here we are. Thank you.</em></p>
+<p><em>Elena Ford</em>
+<em>Captain, MV Marigold</em></p>
+</blockquote>
+<p>Tom looked at the photograph for a long time. Twenty people in a row, squinting into the sun, all of them looking tired and alive.</p>
+<p>Then he unfolded the flag.</p>
+<p>It was old and red and white, exactly as she had said. It was smaller than his. And on the corner, in faded ink, someone long ago had written two words.</p>
+<p><em>We are here.</em></p>
+<p>Tom sat very still. The stove crackled. Mia purred on his lap. Outside, the wind went by, mild and ordinary, a wind with no anger in it at all.</p>
+<p>He thought about forty years. He thought about one hundred and twelve steps, and the nights he had climbed them with his knees hurting and his heart sore, and the mornings he had woken up alone, and the small quiet life he had built out of nothing but weather and patience and a cat.</p>
+<p>He had thought, all those years, that he was keeping a light for other people.</p>
+<p>He had not thought once — not in forty years — that the light might also be saying something about him.</p>
+<p><em>We are here.</em></p>
+<p>&quot;We are here,&quot; Tom said out loud.</p>
+<p>Mia opened one eye.</p>
+<hr />
+
+        </div>
+      </section>
+      <section class="chapter" id="ch-10" data-index="9">
+        <header class="chapter-head">
+          <span class="chapter-num">10</span>
+          <h2 class="chapter-title">Chapter Ten: The Same Night</h2>
+        </header>
+        <div class="chapter-body">
+<p>Nothing changed, and that was the point.</p>
+<p>The supply boat came. The radio worked again. The storms came and went. Tom fixed the shutter that had torn loose and repainted the door and read his old books and fed the stove. His knees still hurt. The stairs were still long.</p>
+<p>Every night, he climbed them.</p>
+<p>Every night, Mia followed him, walking slowly, tail up, like a queen.</p>
+<p>And every night, he turned on the light, and it went round and round, a long slow arm of brightness sweeping across the dark water, telling ships where the land was.</p>
+<p>Only now, sometimes, he thought about the other thing too.</p>
+<p>Not just <em>here is the land.</em></p>
+<p>Not just <em>come this way.</em></p>
+<p>But also: <em>somebody is up here, in the dark, and they are keeping watch, and you are not alone.</em></p>
+<p>There were sailors on that coast who never saw the flag, and never met the man, and never heard the story. The light was just a light to them, a thing that turned, a thing that was always there. They would grow old and retire and die and never know that one night, in a storm, an old man with shaking hands had stood in a window with a piece of cloth in the air and had not let it fall.</p>
+<p>That was all right.</p>
+<p>That was, in fact, exactly what he had wanted, forty years ago, when he had climbed the stairs for the first time with his young wife beside him and his whole life in front of him.</p>
+<p>He had wanted to be the light.</p>
+<p>Not to be known. Not to be thanked.</p>
+<p>Just to be there.</p>
+<p>And he had been. Every single night. One hundred and twelve steps, forty years, one small black cat with one small white spot on her chest, and a light that never, not once, went out.</p>
+<hr />
+<p>Mia died in the spring, quietly, in the sun, on the stone by the door where she had sat for eleven years and watched the sea.</p>
+<p>Tom buried her on the rock, under a flat stone, facing west.</p>
+<p>He did not cry until the evening, and then he cried while he climbed the stairs, all one hundred and twelve, and he was still crying when he turned on the light, and he was still crying when he sat down by the window in the place where she used to sit.</p>
+<p>The light went round and round.</p>
+<p>Tom looked at the sea.</p>
+<p>&quot;One more night,&quot; he said.</p>
+<p>And then, because it was true, and because it had always been true, and because he was an old man in a lighthouse at the edge of the world with nobody left to say it to but the wind:</p>
+<p>&quot;We are here.&quot;</p>
+<p>The light went round and round.</p>
+<p>It went round and round.</p>
+<hr />
+<p><em>The End</em></p>
+
+        </div>
+      </section>
+      <footer class="book-end">
+        <p class="end-mark">&#10086;</p>
+        <p class="end-text">The Lighthouse Keeper&#39;s Cat — 完</p>
+        <p class="end-hint">共 10 章 · 4238 词</p>
+      </footer>
+    </article>
+  </div>
+
+  <!-- 翻页方向光影（点击翻页时的方向反馈） -->
+  <div id="pagehint" aria-hidden="true"></div>
+
+  <!-- 页码：沉浸模式下淡出 -->
+  <div id="pageinfo" aria-hidden="true"></div>
+</main>
+
+<!-- ══════════ 沉浸开关（唯一常驻控件 · 右上角） ══════════ -->
+<button id="immersiveToggle" aria-label="展开或收起工具栏" title="轻点：沉浸 / 展开">
+  <span class="dot-core"></span>
+</button>
+
+<!-- ══════════ 底部工具栏（沉浸模式收起） ══════════ -->
+<nav id="toolbar" aria-label="阅读工具栏">
+  <button class="tb-btn" data-open="toc" aria-label="目录">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    <span>目录</span>
+  </button>
+  <button class="tb-btn" data-open="settings" aria-label="设置">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    <span>设置</span>
+  </button>
+</nav>
+
+<!-- ══════════ 目录抽屉 ══════════ -->
+<aside id="tocDrawer" class="drawer drawer-left" aria-label="目录" aria-hidden="true">
+  <div class="drawer-head">
+    <h3>目录</h3>
+    <button class="drawer-close" data-close aria-label="关闭">&times;</button>
+  </div>
+  <div class="drawer-body">
+    <div class="toc-meta">
+      <p class="toc-book">The Lighthouse Keeper&#39;s Cat</p>
+      <p class="toc-stat">10 章 · 约 4238 词</p>
+    </div>
+    <nav class="toc-list">
+      <button class="toc-item" data-toc-index="0">
+        <span class="toc-num">1</span>
+        <span class="toc-title">Chapter One: The Old Man and the Light</span>
+      </button>
+      <button class="toc-item" data-toc-index="1">
+        <span class="toc-num">2</span>
+        <span class="toc-title">Chapter Two: The Storm</span>
+      </button>
+      <button class="toc-item" data-toc-index="2">
+        <span class="toc-num">3</span>
+        <span class="toc-title">Chapter Three: The Box</span>
+      </button>
+      <button class="toc-item" data-toc-index="3">
+        <span class="toc-num">4</span>
+        <span class="toc-title">Chapter Four: The Climb</span>
+      </button>
+      <button class="toc-item" data-toc-index="4">
+        <span class="toc-num">5</span>
+        <span class="toc-title">Chapter Five: The Ship</span>
+      </button>
+      <button class="toc-item" data-toc-index="5">
+        <span class="toc-num">6</span>
+        <span class="toc-title">Chapter Six: The Rescue</span>
+      </button>
+      <button class="toc-item" data-toc-index="6">
+        <span class="toc-num">7</span>
+        <span class="toc-title">Chapter Seven: Morning</span>
+      </button>
+      <button class="toc-item" data-toc-index="7">
+        <span class="toc-num">8</span>
+        <span class="toc-title">Chapter Eight: The Light</span>
+      </button>
+      <button class="toc-item" data-toc-index="8">
+        <span class="toc-num">9</span>
+        <span class="toc-title">Chapter Nine: The Letter</span>
+      </button>
+      <button class="toc-item" data-toc-index="9">
+        <span class="toc-num">10</span>
+        <span class="toc-title">Chapter Ten: The Same Night</span>
+      </button>
+    </nav>
+  </div>
+</aside>
+
+<!-- ══════════ 设置抽屉 ══════════ -->
+<aside id="settingsDrawer" class="drawer drawer-right" aria-label="设置" aria-hidden="true">
+  <div class="drawer-head">
+    <h3>阅读设置</h3>
+    <button class="drawer-close" data-close aria-label="关闭">&times;</button>
+  </div>
+  <div class="drawer-body">
+
+    <section class="set-group">
+      <h4>翻页方式</h4>
+      <div class="seg" role="group" aria-label="翻页方式">
+        <button class="seg-btn" data-setting="layout" data-value="paginated">左右翻页</button>
+        <button class="seg-btn" data-setting="layout" data-value="scroll">上下滚动</button>
+      </div>
+    </section>
+
+    <section class="set-group">
+      <h4>排版风格</h4>
+      <div class="seg" role="group" aria-label="排版风格">
+        <button class="seg-btn" data-setting="style" data-value="book">书籍感</button>
+        <button class="seg-btn" data-setting="style" data-value="modern">现代</button>
+      </div>
+    </section>
+
+    <section class="set-group">
+      <h4>主题</h4>
+      <div class="seg seg-theme" role="group" aria-label="主题">
+        <button class="seg-btn theme-day" data-setting="theme" data-value="day">日间</button>
+        <button class="seg-btn theme-sepia" data-setting="theme" data-value="sepia">护眼</button>
+        <button class="seg-btn theme-night" data-setting="theme" data-value="night">夜间</button>
+      </div>
+    </section>
+
+    <section class="set-group">
+      <h4>字号 <span class="set-hint" id="fontSizeHint"></span></h4>
+      <div class="stepper">
+        <button class="step-btn" data-step="fontSize" data-delta="-1" aria-label="减小字号">A&minus;</button>
+        <div class="step-bar"><span id="fontSizeBar"></span></div>
+        <button class="step-btn step-big" data-step="fontSize" data-delta="1" aria-label="增大字号">A+</button>
+      </div>
+    </section>
+
+    <section class="set-group">
+      <h4>行距</h4>
+      <div class="seg" role="group" aria-label="行距">
+        <button class="seg-btn" data-setting="lineHeight" data-value="1.5">紧凑</button>
+        <button class="seg-btn" data-setting="lineHeight" data-value="1.85">标准</button>
+        <button class="seg-btn" data-setting="lineHeight" data-value="2.2">宽松</button>
+      </div>
+    </section>
+
+    <section class="set-group">
+      <h4>字体</h4>
+      <div class="seg" role="group" aria-label="字体">
+        <button class="seg-btn" data-setting="fontFamily" data-value="serif">衬线</button>
+        <button class="seg-btn" data-setting="fontFamily" data-value="sans">无衬线</button>
+      </div>
+    </section>
+
+    <section class="set-group">
+      <h4>页宽</h4>
+      <div class="seg" role="group" aria-label="页宽">
+        <button class="seg-btn" data-setting="pageWidth" data-value="narrow">窄</button>
+        <button class="seg-btn" data-setting="pageWidth" data-value="normal">标准</button>
+        <button class="seg-btn" data-setting="pageWidth" data-value="wide">宽</button>
+      </div>
+    </section>
+
+    <p class="set-version">单文件离线电子书 · 阅读进度与设置保存在本机</p>
+  </div>
+</aside>
+
+<!-- ══════════ 轻提示 ══════════ -->
+<div id="toast" role="status" aria-live="polite"></div>
+
+<!-- 遮罩 -->
+<div id="scrim"></div>
+
+<!-- 全书数据（供脚本读取），经 tojson 注入，天然免疫脚本逃逸 -->
+<script id="bookdata" type="application/json">{"title": "The Lighthouse Keeper's Cat", "author": "", "lang": "en", "slug": "the-lighthouse-keepers-cat", "chapterCount": 10, "toc": [{"index": 0, "title": "Chapter One: The Old Man and the Light", "anchor": "ch-1"}, {"index": 1, "title": "Chapter Two: The Storm", "anchor": "ch-2"}, {"index": 2, "title": "Chapter Three: The Box", "anchor": "ch-3"}, {"index": 3, "title": "Chapter Four: The Climb", "anchor": "ch-4"}, {"index": 4, "title": "Chapter Five: The Ship", "anchor": "ch-5"}, {"index": 5, "title": "Chapter Six: The Rescue", "anchor": "ch-6"}, {"index": 6, "title": "Chapter Seven: Morning", "anchor": "ch-7"}, {"index": 7, "title": "Chapter Eight: The Light", "anchor": "ch-8"}, {"index": 8, "title": "Chapter Nine: The Letter", "anchor": "ch-9"}, {"index": 9, "title": "Chapter Ten: The Same Night", "anchor": "ch-10"}]}</script>
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   单文件电子书阅读器 · 交互逻辑
+   模块：Store → 文本偏移 → Paginator → Progress → Settings → UI
+        → Pager（点击翻页） → 启动
+   ═══════════════════════════════════════════════════════════════ */
+(function () {
+  "use strict";
+
+  const $  = (sel, root) => (root || document).querySelector(sel);
+  const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+  function debounce(fn, wait) {
+    let t = null;
+    return function (...a) {
+      clearTimeout(t);
+      t = setTimeout(() => fn.apply(null, a), wait);
+    };
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     1. Store
+     ═══════════════════════════════════════════════════════════ */
+
+  const BOOK = JSON.parse($("#bookdata").textContent);
+  const NS = "dsh-reader:" + BOOK.slug + ":";
+
+  const DEFAULTS = {
+    theme: "day",
+    layout: "paginated",     // paginated | scroll
+    style: "book",           // book | modern
+    fontSize: 18,
+    lineHeight: "1.85",
+    fontFamily: "serif",
+    pageWidth: "normal",
+  };
+
+  const FONT_MIN = 14, FONT_MAX = 30, FONT_STEP = 2;
+  const PAGE_WIDTHS = { narrow: "30rem", normal: "34rem", wide: "42rem" };
+
+  const Store = {
+    _get(key, fb) {
+      try {
+        const raw = localStorage.getItem(NS + key);
+        return raw === null ? fb : JSON.parse(raw);
+      } catch (e) { return fb; }
+    },
+    _set(key, val) {
+      try { localStorage.setItem(NS + key, JSON.stringify(val)); } catch (e) {}
+    },
+    getSettings() { return Object.assign({}, DEFAULTS, this._get("settings", {})); },
+    setSettings(s) { this._set("settings", s); },
+    getProgress() { return this._get("progress", 0); },
+    setProgress(r) { this._set("progress", clamp(r, 0, 1)); },
+  };
+
+  /* ═══════════════════════════════════════════════════════════
+     2. 文本偏移索引 —— 阅读位置以"全文字符偏移"表示，与分页解耦
+     ═══════════════════════════════════════════════════════════ */
+
+  let domIndex = null;
+
+  function buildDomIndex() {
+    const walker = document.createTreeWalker($("#book"), NodeFilter.SHOW_TEXT, {
+      acceptNode(n) {
+        return n.nodeValue && n.nodeValue.trim()
+          ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      },
+    });
+    const nodes = [], starts = [];
+    let total = 0, node;
+    while ((node = walker.nextNode())) {
+      nodes.push(node);
+      starts.push(total);
+      total += node.nodeValue.length;
+    }
+    domIndex = { nodes, starts, total };
+    return domIndex;
+  }
+
+  const getDomIndex = () => domIndex || buildDomIndex();
+
+  function toGlobalOffset(node, offsetInNode) {
+    const idx = getDomIndex();
+    const i = idx.nodes.indexOf(node);
+    return i < 0 ? 0 : idx.starts[i] + offsetInNode;
+  }
+
+  function fromGlobalOffset(g) {
+    const idx = getDomIndex();
+    if (!idx.nodes.length) return null;
+    const v = clamp(g, 0, idx.total);
+    let lo = 0, hi = idx.starts.length - 1, found = 0;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (idx.starts[mid] <= v) { found = mid; lo = mid + 1; }
+      else hi = mid - 1;
+    }
+    return { node: idx.nodes[found], offset: v - idx.starts[found] };
+  }
+
+  function chapterAtOffset(g) {
+    const pos = fromGlobalOffset(g);
+    if (!pos) return 0;
+    const sec = pos.node.parentElement.closest(".chapter");
+    return sec ? +sec.dataset.index : 0;
+  }
+
+  /** 记录当前阅读位置，返回全文字符偏移 */
+  function captureAnchor() {
+    if (document.documentElement.dataset.layout === "scroll") {
+      const book = $("#book");
+      const top = book.getBoundingClientRect().top;
+      const idx = getDomIndex();
+      for (let i = 0; i < idx.nodes.length; i++) {
+        const r = idx.nodes[i].parentElement.getBoundingClientRect();
+        if (r.bottom > top + 8) return { offset: idx.starts[i] };
+      }
+      return { offset: idx.total };
+    }
+    return { offset: Paginator.offsetAtPage(Paginator.page) };
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     3. Paginator —— CSS 多列分页
+     ═══════════════════════════════════════════════════════════ */
+
+  const Paginator = {
+    page: 0,
+    step: 0,
+    total: 1,
+    offsets: [],
+    _pinnedChapter: null,
+    _pinSettled: true,
+
+    measure() {
+      const book = $("#book");
+      const cs = getComputedStyle(book);
+      const gap = parseFloat(cs.columnGap) || 0;
+
+      // column-width 不接受百分比，必须先按容器实测宽度注入绝对长度
+      const colW = book.clientWidth;
+      document.documentElement.style.setProperty("--col-w", colW + "px");
+      void book.offsetWidth;   // 强制回流后再读 scrollWidth
+
+      this.step = book.clientWidth + gap;
+      this.total = Math.max(1, Math.round((book.scrollWidth + gap) / this.step));
+
+      this._buildOffsets();
+      this.page = clamp(this.page, 0, this.total - 1);
+      this.apply(0);
+      return cs;
+    },
+
+    /** 建「页 ↔ 字符偏移」换算表 */
+    _buildOffsets() {
+      const book = $("#book");
+      const idx = getDomIndex();
+      const bookLeft = book.getBoundingClientRect().left;
+
+      const colOf = idx.nodes.map((n) => {
+        const r = n.parentElement.getBoundingClientRect();
+        return Math.floor((r.left - bookLeft + 1) / this.step);
+      });
+
+      const offsets = [];
+      for (let p = 0; p < this.total; p++) {
+        let start = idx.total;
+        for (let i = 0; i < colOf.length; i++) {
+          if (colOf[i] >= p) { start = idx.starts[i]; break; }
+        }
+        offsets.push(start);
+      }
+      offsets[0] = 0;
+      offsets.push(idx.total);   // 哨兵
+      this.offsets = offsets;
+    },
+
+    pageAtOffset(offset) {
+      const offs = this.offsets;
+      if (!offs.length) return 0;
+      let lo = 0, hi = offs.length - 2, found = 0;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (offs[mid] <= offset) { found = mid; lo = mid + 1; }
+        else hi = mid - 1;
+      }
+      return clamp(found, 0, this.total - 1);
+    },
+
+    offsetAtPage(p) {
+      const offs = this.offsets;
+      return offs.length ? offs[clamp(p, 0, offs.length - 2)] : 0;
+    },
+
+    /** 定位某章正文开始的那一页。
+        章节标题的偏移常落在上一页尾部（标题前有留白），
+        直接反推会错位到上一章，故用标题的实际视觉列号校验修正。 */
+    pageOfChapter(index) {
+      const section = $('.chapter[data-index="' + index + '"]');
+      if (!section) return 0;
+
+      const heading = section.querySelector(".chapter-title");
+      let page = 0;
+      if (heading) {
+        const w = document.createTreeWalker(heading, NodeFilter.SHOW_TEXT);
+        const tn = w.nextNode();
+        const off = tn ? toGlobalOffset(tn, 0) : 0;
+        page = this.pageAtOffset(off);
+
+        const bookLeft = $("#book").getBoundingClientRect().left;
+        const col = Math.floor((heading.getBoundingClientRect().left - bookLeft + 1) / this.step);
+        if (col > page) page = col;
+      }
+      return clamp(page, 0, this.total - 1);
+    },
+
+    /** 应用位移。offset 为额外像素偏移（默认 0） */
+    apply(offset, animate) {
+      const book = $("#book");
+      const x = -this.page * this.step + (offset || 0);
+      if (animate === false) {
+        book.style.transition = "none";
+        book.style.transform = "translate3d(" + x + "px,0,0)";
+        void book.offsetWidth;
+        book.style.transition = "";
+      } else {
+        book.style.transform = "translate3d(" + x + "px,0,0)";
+      }
+      this._updateInfo();
+      UI.syncChapterUI();
+    },
+
+    goto(p, animate) {
+      const next = clamp(p, 0, this.total - 1);
+      if (typeof this._pinnedChapter === "number" && this._pinSettled) {
+        if (chapterAtOffset(this.offsetAtPage(next)) !== this._pinnedChapter) {
+          this._pinnedChapter = null;
+        }
+      }
+      if (next === this.page) { this.apply(0, animate); return; }
+      this.page = next;
+      this.apply(0, animate);
+      Progress.save();
+    },
+
+    next() { this.goto(this.page + 1); },
+    prev() { this.goto(this.page - 1); },
+
+    gotoChapter(index) {
+      const section = $('.chapter[data-index="' + index + '"]');
+      if (!section) return;
+
+      if (document.documentElement.dataset.layout === "scroll") {
+        section.scrollIntoView({ behavior: "smooth", block: "start" });
+        UI.syncChapterUI();
+        Progress.saveSoon();
+        return;
+      }
+      const target = this.pageOfChapter(index);
+      this._pinnedChapter = index;
+      this._pinSettled = false;
+      if (target === this.page) {
+        UI.syncChapterUI();
+        Progress.save();
+      } else {
+        this.goto(target);
+      }
+      requestAnimationFrame(() => { this._pinSettled = true; });
+    },
+
+    /** 重排：记住字符位置 → 重新测量 → 回到同一处 */
+    reflow() {
+      const anchor = captureAnchor();
+      requestAnimationFrame(() => {
+        this.measure();
+        this.goto(this.pageAtOffset(anchor.offset), false);
+        const idx = getDomIndex();
+        Progress.updateBar(idx.total ? anchor.offset / idx.total : 0);
+      });
+    },
+
+    scheduleReflow() { debounce(() => this.reflow(), 70)(); },
+
+    _updateInfo() {
+      if (document.documentElement.dataset.layout !== "paginated") return;
+      $("#pageinfo").textContent = (this.page + 1) + " / " + this.total;
+    },
+  };
+
+  /* ═══════════════════════════════════════════════════════════
+     4. Progress
+     ═══════════════════════════════════════════════════════════ */
+
+  const Progress = {
+    _ratio: 0,
+    updateBar(ratio) {
+      if (typeof ratio === "number") this._ratio = clamp(ratio, 0, 1);
+      $("#progressfill").style.width = (this._ratio * 100).toFixed(2) + "%";
+    },
+    save() {
+      const a = captureAnchor();
+      const idx = getDomIndex();
+      this._ratio = idx.total ? a.offset / idx.total : 0;
+      Store.setProgress(this._ratio);
+      this.updateBar(this._ratio);
+    },
+    saveSoon: debounce(function () { Progress.save(); }, 400),
+    restore() {
+      const ratio = Store.getProgress();
+      this._ratio = ratio;
+      this.updateBar(ratio);
+      if (ratio <= 0) return;
+      const idx = getDomIndex();
+      const target = ratio * idx.total;
+      if (document.documentElement.dataset.layout === "scroll") {
+        const pos = fromGlobalOffset(target);
+        if (pos) {
+          const r = pos.node.parentElement.getBoundingClientRect();
+          $("#book").scrollTop += r.top - $("#book").getBoundingClientRect().top - 12;
+        }
+      } else {
+        Paginator.goto(Paginator.pageAtOffset(target), false);
+      }
+    },
+  };
+
+  /* ═══════════════════════════════════════════════════════════
+     5. Settings
+     ═══════════════════════════════════════════════════════════ */
+
+  let settings = Store.getSettings();
+
+  const Settings = {
+    get() { return settings; },
+    apply(patch) {
+      const prevLayout = settings.layout;
+      Object.assign(settings, patch || {});
+      Store.setSettings(settings);
+      this._paint();
+      const touched = ["fontSize", "lineHeight", "fontFamily", "pageWidth", "style", "layout"];
+      if (touched.some((k) => k in patch)) {
+        if (prevLayout !== settings.layout) requestAnimationFrame(() => Paginator.reflow());
+        else Paginator.scheduleReflow();
+      }
+    },
+    _paint() {
+      const root = document.documentElement;
+      root.dataset.theme = settings.theme;
+      root.dataset.layout = settings.layout;
+      root.dataset.style = settings.style;
+      root.dataset.fontfamily = settings.fontFamily;
+      root.style.setProperty("--font-size", settings.fontSize + "px");
+      root.style.setProperty("--line-height", settings.lineHeight);
+      root.style.setProperty("--page-width", PAGE_WIDTHS[settings.pageWidth] || PAGE_WIDTHS.normal);
+
+      const meta = $('meta[name="theme-color"]');
+      if (meta) {
+        const bg = getComputedStyle(root).getPropertyValue("--bg").trim();
+        meta.setAttribute("content", bg || "#f6f1e7");
+      }
+
+      $$("[data-setting]").forEach((btn) => {
+        btn.classList.toggle("is-active",
+          String(settings[btn.dataset.setting]) === btn.dataset.value);
+      });
+
+      const pct = ((settings.fontSize - FONT_MIN) / (FONT_MAX - FONT_MIN)) * 100;
+      $("#fontSizeBar").style.width = clamp(pct, 4, 100) + "%";
+      $("#fontSizeHint").textContent = settings.fontSize + "px";
+    },
+    step(key, delta) {
+      if (key === "fontSize") {
+        const next = clamp(settings.fontSize + delta * FONT_STEP, FONT_MIN, FONT_MAX);
+        if (next === settings.fontSize) {
+          UI.toast(next >= FONT_MAX ? "已是最大字号" : "已是最小字号");
+          return;
+        }
+        this.apply({ fontSize: next });
+      }
+    },
+  };
+
+  /* ═══════════════════════════════════════════════════════════
+     6. UI —— 沉浸开关 / 工具栏 / 抽屉 / 全屏 / 提示
+     ═══════════════════════════════════════════════════════════ */
+
+  const UI = {
+    _toastTimer: null,
+    _awakeTimer: null,
+    immersive: true,     // 默认沉浸：只留正文
+
+    /** 展开 / 收起工具栏。入口只有两个：右上角小圆点、Esc 键。
+        正文区点击不接线到这里，避免误弹底部菜单。 */
+    toggleToolbar() {
+      document.body.dataset.toolbar =
+        document.body.dataset.toolbar === "open" ? "closed" : "open";
+      // 收起工具栏时若抽屉开着，一并关掉
+      if (document.body.dataset.toolbar === "closed") this.closeDrawers();
+    },
+
+    openToolbar() { document.body.dataset.toolbar = "open"; },
+    closeToolbar() { document.body.dataset.toolbar = "closed"; },
+
+    /** 沉浸开关：轻点小圆点 → 切换"只留正文"与"展开工具栏"，
+        同时尝试进入/退出浏览器全屏（隐藏地址栏） */
+    toggleImmersive() {
+      const expanding = document.body.dataset.toolbar !== "open";
+      document.body.dataset.toolbar = expanding ? "open" : "closed";
+      if (!expanding) this.closeDrawers();
+      this._syncFullscreen(expanding);
+      this.awaken();
+      this.toast(expanding ? "工具栏已展开" : "沉浸阅读", 1100);
+    },
+
+    _syncFullscreen(enter) {
+      const el = document.documentElement;
+      try {
+        if (enter) {
+          if (!document.fullscreenElement && el.requestFullscreen) {
+            el.requestFullscreen().catch(() => {});
+          }
+          if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock("portrait").catch(() => {});
+          }
+        } else {
+          if (document.fullscreenElement && document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+          }
+        }
+      } catch (e) { /* iOS 不支持全屏 API，静默降级 */ }
+    },
+
+    /** 让圆点短暂显现，随后自动变淡。
+        只在"需要用户注意这个开关"的时机调用（首次进入、展开工具栏）——
+        不要绑到翻页或触摸上，否则每次点击都会闪一下，反而干扰阅读。 */
+    awaken() {
+      const dot = $("#immersiveToggle");
+      if (!dot) return;
+      dot.classList.add("is-awake");
+      clearTimeout(this._awakeTimer);
+      this._awakeTimer = setTimeout(() => dot.classList.remove("is-awake"), 1600);
+    },
+
+    openDrawer(which) {
+      const sel = { toc: "#tocDrawer", settings: "#settingsDrawer" }[which];
+      if (!sel) return;
+      const el = $(sel);
+      if (!el) return;
+      this.openToolbar();
+      $$(".drawer").forEach((d) => {
+        d.classList.remove("is-open");
+        d.setAttribute("aria-hidden", "true");
+      });
+      el.classList.add("is-open");
+      el.setAttribute("aria-hidden", "false");
+      document.body.dataset.drawer = "open";
+      if (which === "toc") this.syncChapterUI();
+    },
+
+    closeDrawers() {
+      $$(".drawer").forEach((d) => {
+        d.classList.remove("is-open");
+        d.setAttribute("aria-hidden", "true");
+      });
+      document.body.dataset.drawer = "closed";
+    },
+
+    syncChapterUI() {
+      const idx = currentChapterIndex();
+      $$(".toc-item").forEach((it) => {
+        it.classList.toggle("is-current", +it.dataset.tocIndex === idx);
+      });
+    },
+
+    toast(msg, ms) {
+      const el = $("#toast");
+      el.textContent = msg;
+      el.classList.add("is-open");
+      clearTimeout(this._toastTimer);
+      this._toastTimer = setTimeout(() => el.classList.remove("is-open"), ms || 1800);
+    },
+  };
+
+  function currentChapterIndex() {
+    if (document.documentElement.dataset.layout === "scroll") {
+      const book = $("#book");
+      const top = book.getBoundingClientRect().top + 60;
+      let cur = 0;
+      for (const s of $$(".chapter")) {
+        if (s.getBoundingClientRect().top <= top) cur = +s.dataset.index;
+        else break;
+      }
+      return cur;
+    }
+    if (typeof Paginator._pinnedChapter === "number") return Paginator._pinnedChapter;
+    return chapterAtOffset(Paginator.offsetAtPage(Paginator.page));
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     7. Pager —— 点击翻页 + 方向反馈
+     设计要点：
+       · 只保留点击（中轴线左右半屏）与键盘翻页，不做拖拽手势
+       · 翻页动画由一次 transform 过渡完成，cubic-bezier 收尾自然
+       · 翻页瞬间给一条边缘光影，方向可视化，不依赖手指位移
+     ═══════════════════════════════════════════════════════════ */
+
+  const Pager = {
+    _lock: 0,          // 连点合并窗口，避免一次点击触发两页
+    _hintTimer: null,
+
+    /** 翻页并给出方向提示 */
+    go(delta) {
+      if (delta === 0) return;
+      if (document.documentElement.dataset.layout !== "paginated") return;
+
+      const now = Date.now();
+      if (now - this._lock < 90) return;   // 90ms 内的重复点击直接吞掉
+      this._lock = now;
+
+      const target = clamp(Paginator.page + delta, 0, Paginator.total - 1);
+      if (target === Paginator.page) {
+        // 已到首/末页：给一次"顶到边"的反馈，而不是静默无响应
+        this.bump(delta);
+        UI.toast(delta > 0 ? "已是最后一页" : "已是第一页", 1000);
+        return;
+      }
+      Paginator.goto(target);
+      this.hint(delta);
+    },
+
+    next() { this.go(1); },
+    prev() { this.go(-1); },
+
+    /** 边缘光影：翻页瞬间从对应方向扫过，替代拖拽的跟手感 */
+    hint(delta) {
+      const el = $("#pagehint");
+      if (!el) return;
+      el.dataset.dir = delta > 0 ? "next" : "prev";
+      el.classList.remove("is-on");
+      void el.offsetWidth;         // 强制回流，让动画可重入
+      el.classList.add("is-on");
+      clearTimeout(this._hintTimer);
+      this._hintTimer = setTimeout(() => el.classList.remove("is-on"), 420);
+    },
+
+    /** 到顶/到底时的轻微回弹 */
+    bump(delta) {
+      const book = $("#book");
+      const nudge = delta > 0 ? -14 : 14;
+      book.style.transition = "transform .16s ease-out";
+      book.style.transform = "translate3d(" + (-Paginator.page * Paginator.step + nudge) + "px,0,0)";
+      setTimeout(() => {
+        book.style.transition = "";
+        Paginator.apply(0, true);
+      }, 160);
+    },
+  };
+
+  /* ═══════════════════════════════════════════════════════════
+     8. 点击分区与快捷键
+     ═══════════════════════════════════════════════════════════ */
+
+  function initGestures() {
+    const vp = $("#viewport");
+
+    /* 屏幕中轴线左右分区点击：左半屏上一页、右半屏下一页。
+       不存在中间态——工具栏只由右上角小圆点开关，点击正文区永不弹菜单。
+       触屏走 touchend（判点击），鼠标走 click，两者共用同一套坐标判定。 */
+    function handleTap(x) {
+      if (document.body.dataset.drawer === "open") { UI.closeDrawers(); return; }
+
+      // 滚动模式没有"页"的概念，左右分区不翻页，交给纵向滚动
+      if (document.documentElement.dataset.layout !== "paginated") return;
+
+      if (x < window.innerWidth / 2) Pager.prev();
+      else Pager.next();
+    }
+
+    /* 触摸：只识别"轻点"，移动超过阈值即视为滑动/选词，不再当作点击 */
+    let tapCandidate = null;
+
+    vp.addEventListener("touchstart", (e) => {
+      if (e.touches.length !== 1) { tapCandidate = null; return; }
+      const t = e.touches[0];
+      tapCandidate = { x: t.clientX, y: t.clientY, t: e.timeStamp || Date.now() };
+    }, { passive: true });
+
+    vp.addEventListener("touchmove", (e) => {
+      if (!tapCandidate) return;
+      const t = e.touches[0];
+      if (Math.abs(t.clientX - tapCandidate.x) > 10 ||
+          Math.abs(t.clientY - tapCandidate.y) > 10) {
+        tapCandidate = null;           // 移动了，就不算点击
+      }
+    }, { passive: true });
+
+    vp.addEventListener("touchend", (e) => {
+      if (!tapCandidate) return;
+      const t = e.changedTouches && e.changedTouches[0];
+      const dt = (e.timeStamp || Date.now()) - tapCandidate.t;
+      tapCandidate = null;
+      if (t && dt < 500) handleTap(t.clientX);
+    }, { passive: true });
+
+    vp.addEventListener("touchcancel", () => { tapCandidate = null; }, { passive: true });
+
+    // 鼠标：无触摸能力时启用（触屏浏览器里 touchend 已经处理过，避免重复触发）
+    if (!("ontouchstart" in window)) {
+      vp.addEventListener("click", (e) => {
+        if (e.target.closest("#toolbar, .drawer, #immersiveToggle, #toast")) return;
+        if (document.body.dataset.drawer === "open") { UI.closeDrawers(); return; }
+        handleTap(e.clientX);
+      });
+    }
+
+    // 双击缩放抑制
+    document.addEventListener("dblclick", (e) => e.preventDefault(), { passive: false });
+
+    // 键盘
+    document.addEventListener("keydown", (e) => {
+      if (e.target.matches("input, textarea")) return;
+      const paginated = document.documentElement.dataset.layout === "paginated";
+      switch (e.key) {
+        case "ArrowRight": case "PageDown":
+          if (paginated) Pager.next(); break;
+        case "ArrowLeft": case "PageUp":
+          if (paginated) Pager.prev(); break;
+        case " ":
+          if (paginated) { e.preventDefault(); Pager.next(); } break;
+        case "Home":
+          paginated ? Paginator.goto(0) : $("#book").scrollTo({ top: 0 }); break;
+        case "End":
+          paginated ? Paginator.goto(Paginator.total - 1)
+                    : $("#book").scrollTo({ top: $("#book").scrollHeight }); break;
+        case "f": case "F":
+          UI.toggleImmersive(); break;
+        case "Escape":
+          UI.closeDrawers();
+          if (document.body.dataset.toolbar === "open") UI.closeToolbar();
+          break;
+      }
+    });
+
+    // 视口变化重排
+    window.addEventListener("resize", debounce(() => Paginator.reflow(), 180));
+    window.addEventListener("orientationchange", () => setTimeout(() => Paginator.reflow(), 320));
+
+    // 滚动模式：进度与章节同步
+    $("#book").addEventListener("scroll", () => {
+      if (document.documentElement.dataset.layout !== "scroll") return;
+      UI.syncChapterUI();
+      Progress.saveSoon();
+    }, { passive: true });
+
+    window.addEventListener("beforeunload", () => Progress.save());
+    document.addEventListener("visibilitychange", () => { if (document.hidden) Progress.save(); });
+
+    // 全屏状态外部变化时同步标记
+    document.addEventListener("fullscreenchange", () => {
+      document.documentElement.classList.toggle("has-fullscreen", !!document.fullscreenElement);
+    });
+    document.documentElement.classList.toggle("has-fullscreen", !!document.fullscreenEnabled);
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     9. 事件绑定
+     ═══════════════════════════════════════════════════════════ */
+
+  function bindUI() {
+    // 沉浸开关：轻点切换；按下给即时反馈
+    const dot = $("#immersiveToggle");
+    dot.addEventListener("click", (e) => { e.stopPropagation(); UI.toggleImmersive(); });
+    dot.addEventListener("pointerdown", () => dot.classList.add("is-pressing"));
+    ["pointerup", "pointercancel", "pointerleave"].forEach((ev) => {
+      dot.addEventListener(ev, () => dot.classList.remove("is-pressing"));
+    });
+
+    // 工具栏按钮
+    $$("[data-open]").forEach((btn) => {
+      btn.addEventListener("click", () => UI.openDrawer(btn.dataset.open));
+    });
+    $$("[data-close]").forEach((btn) => {
+      btn.addEventListener("click", () => UI.closeDrawers());
+    });
+    $("#scrim").addEventListener("click", () => UI.closeDrawers());
+
+    // 设置项
+    $$("[data-setting]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        Settings.apply({ [btn.dataset.setting]: btn.dataset.value });
+      });
+    });
+    $$("[data-step]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        Settings.step(btn.dataset.step, +btn.dataset.delta);
+      });
+    });
+
+    // 目录项
+    $$("[data-toc-index]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const idx = +btn.dataset.tocIndex;
+        UI.closeDrawers();
+        requestAnimationFrame(() => Paginator.gotoChapter(idx));
+      });
+    });
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     10. 启动
+     ═══════════════════════════════════════════════════════════ */
+
+  function boot() {
+    Settings._paint();
+
+    document.body.dataset.toolbar = "closed";   // 默认沉浸
+    document.body.dataset.drawer = "closed";
+
+    bindUI();
+    buildDomIndex();
+
+    const start = () => {
+      Paginator.measure();
+      Progress.restore();
+      UI.syncChapterUI();
+    };
+
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => requestAnimationFrame(start));
+    } else {
+      requestAnimationFrame(start);
+    }
+
+    initGestures();
+
+    // 首次进入给一次圆点提示，让用户知道那里有个开关
+    setTimeout(() => {
+      UI.awaken();
+      UI.toast("轻点右上圆点可展开工具栏", 2400);
+    }, 900);
+
+    window.__reader = {
+      book: BOOK, store: Store, settings: Settings,
+      paginator: Paginator, progress: Progress, ui: UI, pager: Pager,
+    };
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
+})();
+
+</script>
+</body>
+</html>

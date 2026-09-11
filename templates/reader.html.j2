@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="{{ book.lang }}" data-theme="day" data-layout="paginated" data-style="book" data-ui="immersive">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#f6f1e7">
+<title>{{ book.title }}</title>
+<style>
+{{ css }}
+</style>
+</head>
+<body>
+
+<!-- 顶部进度条：沉浸模式下淡出 -->
+<div id="progressbar" role="progressbar" aria-label="阅读进度"><span id="progressfill"></span></div>
+
+<!-- ══════════ 阅读区 ══════════ -->
+<main id="viewport" aria-label="正文">
+  <div id="stage">
+    <article id="book">
+{% for c in chapters %}
+      <section class="chapter" id="{{ c.anchor }}" data-index="{{ c.index }}">
+        <header class="chapter-head">
+          <span class="chapter-num">{{ c.index + 1 }}</span>
+          <h2 class="chapter-title">{{ c.title }}</h2>
+        </header>
+        <div class="chapter-body">
+{{ c.html }}
+        </div>
+      </section>
+{% endfor %}
+      <footer class="book-end">
+        <p class="end-mark">&#10086;</p>
+        <p class="end-text">{{ book.title }} — 完</p>
+        <p class="end-hint">共 {{ book.chapters|length }} 章 · {{ book.word_count }} 词</p>
+      </footer>
+    </article>
+  </div>
+
+  <!-- 翻页方向光影（点击翻页时的方向反馈） -->
+  <div id="pagehint" aria-hidden="true"></div>
+
+  <!-- 页码：沉浸模式下淡出 -->
+  <div id="pageinfo" aria-hidden="true"></div>
+</main>
+
+<!-- ══════════ 沉浸开关（唯一常驻控件 · 右上角） ══════════ -->
+<button id="immersiveToggle" aria-label="展开或收起工具栏" title="轻点：沉浸 / 展开">
+  <span class="dot-core"></span>
+</button>
+
+<!-- ══════════ 底部工具栏（沉浸模式收起） ══════════ -->
+<nav id="toolbar" aria-label="阅读工具栏">
+  <button class="tb-btn" data-open="toc" aria-label="目录">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    <span>目录</span>
+  </button>
+  <button class="tb-btn" data-open="settings" aria-label="设置">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    <span>设置</span>
+  </button>
+</nav>
+
+<!-- ══════════ 目录抽屉 ══════════ -->
+<aside id="tocDrawer" class="drawer drawer-left" aria-label="目录" aria-hidden="true">
+  <div class="drawer-head">
+    <h3>目录</h3>
+    <button class="drawer-close" data-close aria-label="关闭">&times;</button>
+  </div>
+  <div class="drawer-body">
+    <div class="toc-meta">
+      <p class="toc-book">{{ book.title }}</p>
+      <p class="toc-stat">{{ book.chapters|length }} 章 · 约 {{ book.word_count }} 词</p>
+    </div>
+    <nav class="toc-list">
+{% for c in chapters %}
+      <button class="toc-item" data-toc-index="{{ c.index }}">
+        <span class="toc-num">{{ c.index + 1 }}</span>
+        <span class="toc-title">{{ c.title }}</span>
+      </button>
+{% endfor %}
+    </nav>
+  </div>
+</aside>
+
+<!-- ══════════ 设置抽屉 ══════════ -->
+<aside id="settingsDrawer" class="drawer drawer-right" aria-label="设置" aria-hidden="true">
+  <div class="drawer-head">
+    <h3>阅读设置</h3>
+    <button class="drawer-close" data-close aria-label="关闭">&times;</button>
+  </div>
+  <div class="drawer-body">
+
+    <section class="set-group">
+      <h4>翻页方式</h4>
+      <div class="seg" role="group" aria-label="翻页方式">
+        <button class="seg-btn" data-setting="layout" data-value="paginated">左右翻页</button>
+        <button class="seg-btn" data-setting="layout" data-value="scroll">上下滚动</button>
+      </div>
+    </section>
+
+    <section class="set-group">
+      <h4>排版风格</h4>
+      <div class="seg" role="group" aria-label="排版风格">
+        <button class="seg-btn" data-setting="style" data-value="book">书籍感</button>
+        <button class="seg-btn" data-setting="style" data-value="modern">现代</button>
+      </div>
+    </section>
+
+    <section class="set-group">
+      <h4>主题</h4>
+      <div class="seg seg-theme" role="group" aria-label="主题">
+        <button class="seg-btn theme-day" data-setting="theme" data-value="day">日间</button>
+        <button class="seg-btn theme-sepia" data-setting="theme" data-value="sepia">护眼</button>
+        <button class="seg-btn theme-night" data-setting="theme" data-value="night">夜间</button>
+      </div>
+    </section>
+
+    <section class="set-group">
+      <h4>字号 <span class="set-hint" id="fontSizeHint"></span></h4>
+      <div class="stepper">
+        <button class="step-btn" data-step="fontSize" data-delta="-1" aria-label="减小字号">A&minus;</button>
+        <div class="step-bar"><span id="fontSizeBar"></span></div>
+        <button class="step-btn step-big" data-step="fontSize" data-delta="1" aria-label="增大字号">A+</button>
+      </div>
+    </section>
+
+    <section class="set-group">
+      <h4>行距</h4>
+      <div class="seg" role="group" aria-label="行距">
+        <button class="seg-btn" data-setting="lineHeight" data-value="1.5">紧凑</button>
+        <button class="seg-btn" data-setting="lineHeight" data-value="1.85">标准</button>
+        <button class="seg-btn" data-setting="lineHeight" data-value="2.2">宽松</button>
+      </div>
+    </section>
+
+    <section class="set-group">
+      <h4>字体</h4>
+      <div class="seg" role="group" aria-label="字体">
+        <button class="seg-btn" data-setting="fontFamily" data-value="serif">衬线</button>
+        <button class="seg-btn" data-setting="fontFamily" data-value="sans">无衬线</button>
+      </div>
+    </section>
+
+    <section class="set-group">
+      <h4>页宽</h4>
+      <div class="seg" role="group" aria-label="页宽">
+        <button class="seg-btn" data-setting="pageWidth" data-value="narrow">窄</button>
+        <button class="seg-btn" data-setting="pageWidth" data-value="normal">标准</button>
+        <button class="seg-btn" data-setting="pageWidth" data-value="wide">宽</button>
+      </div>
+    </section>
+
+    <p class="set-version">单文件离线电子书 · 阅读进度与设置保存在本机</p>
+  </div>
+</aside>
+
+<!-- ══════════ 轻提示 ══════════ -->
+<div id="toast" role="status" aria-live="polite"></div>
+
+<!-- 遮罩 -->
+<div id="scrim"></div>
+
+<!-- 全书数据（供脚本读取），经 tojson 注入，天然免疫脚本逃逸 -->
+<script id="bookdata" type="application/json">{{ payload_json }}</script>
+<script>
+{{ js }}
+</script>
+</body>
+</html>

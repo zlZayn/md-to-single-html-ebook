@@ -1,0 +1,749 @@
+/* ═══════════════════════════════════════════════════════════════
+   单文件电子书阅读器 · 样式
+   状态由 <html> 上的 data-* 驱动：
+     data-theme   day | sepia | night
+     data-layout  paginated | scroll
+     data-style   book | modern
+     data-ui      immersive | expanded
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ───────── 主题变量（日间） ───────── */
+:root {
+  --bg:        #f6f1e7;
+  --bg-deep:   #ece4d6;
+  --fg:        #2b2622;
+  --fg-soft:   #6b6157;
+  --fg-faint:  #a09689;
+  --accent:    #a6652f;
+  --accent-sf: #f0e3d1;
+  --line:      #ddd2c0;
+  --panel:     #fffdf9;
+  --shadow:    0 10px 40px rgba(60, 45, 25, .18);
+  --scrim:     rgba(30, 22, 12, .38);
+
+  /* 阅读区度量 */
+  --font-size:   18px;
+  --line-height: 1.85;
+  --page-width:  34rem;
+  --pad-x:       1.35rem;
+  --pad-y:       2.5rem;
+  --font-stack:  Georgia, "Times New Roman", "Songti SC", "Noto Serif SC", serif;
+
+  /* UI 过渡 */
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ui-dur:   .34s;
+}
+
+[data-theme="sepia"] {
+  --bg:        #f3e6cd;
+  --bg-deep:   #e8d7b6;
+  --fg:        #3b2f1f;
+  --fg-soft:   #736048;
+  --fg-faint:  #a89272;
+  --accent:    #8f5a20;
+  --accent-sf: #e9d5b2;
+  --line:      #d6c19c;
+  --panel:     #fbf2e0;
+}
+
+[data-theme="night"] {
+  --bg:        #16181c;
+  --bg-deep:   #0f1114;
+  --fg:        #cbcdd2;
+  --fg-soft:   #8c9099;
+  --fg-faint:  #5e636c;
+  --accent:    #d09a5c;
+  --accent-sf: #2a2620;
+  --line:      #2c3037;
+  --panel:     #1d2026;
+  --shadow:    0 10px 40px rgba(0, 0, 0, .55);
+  --scrim:     rgba(0, 0, 0, .55);
+}
+
+/* ───────── 基础 ───────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-deep);
+  color: var(--fg);
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-family: var(--font-stack);
+  transition: background .28s ease, color .28s ease;
+  /* 禁止浏览器接管横向手势，让翻页跟手更稳定 */
+  overscroll-behavior: none;
+}
+
+[data-fontfamily="sans"] {
+  --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                "Hiragino Sans GB", "Microsoft YaHei", Roboto, sans-serif;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ══════════ 顶部进度条 ══════════ */
+#progressbar {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: transparent;
+  z-index: 60;
+  pointer-events: none;
+  transition: opacity var(--ui-dur) var(--ease-out);
+}
+#progressfill {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  opacity: .55;
+  transition: width .3s ease;
+}
+/* 沉浸模式下进度条淡出，只留极淡一条，不干扰阅读 */
+[data-ui="immersive"] #progressbar { opacity: 0; }
+
+/* ══════════ 阅读区 ══════════ */
+#viewport {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  transition: background .28s ease;
+}
+
+#stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+#book {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  font-size: var(--font-size);
+  line-height: var(--line-height);
+  color: var(--fg);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  /* 英文长文本在窄屏用 auto 断词会产生 some-where 这类难看断点 */
+  hyphens: manual;
+  -webkit-hyphens: manual;
+}
+
+/* ───────── 正文语义 ───────── */
+.chapter-body p {
+  margin: 0 0 1.05em;
+  text-align: justify;
+  hanging-punctuation: first;
+}
+
+.chapter-body h3 {
+  font-size: 1.05em;
+  font-weight: 600;
+  color: var(--fg-soft);
+  margin: 1.8em 0 .8em;
+  letter-spacing: .02em;
+}
+
+.chapter-body blockquote {
+  margin: 1.4em 0;
+  padding: .2em 0 .2em 1.1em;
+  border-left: 3px solid var(--line);
+  color: var(--fg-soft);
+  font-style: italic;
+}
+
+.chapter-body em { font-style: italic; }
+.chapter-body strong { font-weight: 600; }
+
+.chapter-body hr {
+  border: 0;
+  margin: 1.8em auto;
+  width: 38%;
+  height: 0;
+  border-top: 1px solid var(--line);
+  position: relative;
+}
+
+.chapter-body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .88em;
+  background: var(--accent-sf);
+  padding: .1em .35em;
+  border-radius: .25em;
+}
+
+/* 章节头 */
+.chapter-head {
+  text-align: center;
+  margin: 0 0 1.8em;
+}
+.chapter-num {
+  display: block;
+  font-size: .72em;
+  letter-spacing: .38em;
+  text-indent: .38em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  margin-bottom: .7em;
+}
+.chapter-title {
+  font-size: 1.42em;
+  font-weight: 600;
+  line-height: 1.35;
+  margin: 0;
+  letter-spacing: .005em;
+}
+
+/* 书末页 */
+.book-end {
+  text-align: center;
+  margin: 3em 0 4em;
+  color: var(--fg-faint);
+}
+.end-mark { font-size: 1.6em; margin: 0 0 .6em; color: var(--accent); }
+.end-text { margin: 0 0 .4em; font-size: .95em; }
+.end-hint { margin: 0; font-size: .78em; letter-spacing: .04em; }
+
+/* ───────── 排版风格：书籍感 ───────── */
+[data-style="book"] .chapter-body p { text-indent: 1.6em; }
+[data-style="book"] .chapter-body > p:first-of-type { text-indent: 0; }
+[data-style="book"] .chapter-body > p:first-of-type::first-letter {
+  float: left;
+  font-size: 3.05em;
+  line-height: .84;
+  padding: .04em .09em 0 0;
+  font-weight: 600;
+  color: var(--accent);
+}
+[data-style="book"] .chapter-body blockquote p { text-indent: 0; }
+[data-style="book"] .chapter-title { font-style: italic; font-weight: 500; }
+
+/* ───────── 排版风格：现代 ───────── */
+[data-style="modern"] .chapter-body p {
+  text-indent: 0;
+  text-align: left;
+  margin-bottom: 1.35em;
+}
+[data-style="modern"] .chapter-head {
+  text-align: left;
+  margin-bottom: 2.2em;
+  padding-bottom: 1em;
+  border-bottom: 1px solid var(--line);
+}
+[data-style="modern"] .chapter-num {
+  text-align: left;
+  letter-spacing: .22em;
+  margin-bottom: .55em;
+}
+[data-style="modern"] .chapter-title {
+  font-size: 1.55em;
+  letter-spacing: -0.01em;
+}
+[data-style="modern"] .chapter-body > p:first-of-type::first-letter {
+  float: none;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* ══════════ 分页模式（CSS 多列） ══════════ */
+/* 三个硬约束（来自 epub.js / 起点阅读页的成熟实践）：
+   1. column-width 必须用绝对长度 —— 百分比对它是非法值，会被浏览器直接丢弃；
+   2. 容器必须同时固定宽与高，「宽高完美限制」才能形成一列一页；
+   3. overflow:hidden 只能放父层 #stage，绝不能加到多列容器 #book 上 ——
+      Chrome 55+ 对「overflow 非 visible 的多列容器」有渲染 bug，
+      会导致第 3 栏之后的分栏整片不显示。 */
+[data-layout="paginated"] #stage {
+  padding: var(--pad-y) var(--pad-x);
+}
+
+[data-layout="paginated"] #book {
+  /* 兜底值，真实宽度由 Paginator 实测后写入 --col-w */
+  column-width: var(--col-w, 20rem);
+  column-gap: calc(var(--pad-x) * 2);
+  column-fill: auto;
+  height: 100%;
+  padding: 0;
+  /* 翻页位移。过渡曲线收尾要"稳"：起步略快、末段缓慢收敛，
+     不要用回弹感强的曲线，否则连续翻页会显得飘。 */
+  transform: translate3d(0, 0, 0);
+  transition: transform .38s var(--ease-out);
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* 翻页光影：点击左右侧时从对应方向扫过一道极淡的渐变，
+   在没有拖拽跟手的情况下提供方向反馈。 */
+#pagehint {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .4s ease;
+}
+#pagehint[data-dir="next"] {
+  background: linear-gradient(to left, rgba(0, 0, 0, .09), transparent 46%);
+}
+#pagehint[data-dir="prev"] {
+  background: linear-gradient(to right, rgba(0, 0, 0, .09), transparent 46%);
+}
+#pagehint.is-on { opacity: 1; }
+[data-theme="night"] #pagehint[data-dir="next"] {
+  background: linear-gradient(to left, rgba(255, 255, 255, .07), transparent 46%);
+}
+[data-theme="night"] #pagehint[data-dir="prev"] {
+  background: linear-gradient(to right, rgba(255, 255, 255, .07), transparent 46%);
+}
+[data-layout="scroll"] #pagehint { display: none; }
+
+/* 相邻页之间的装订线 */
+[data-layout="paginated"] #stage::before {
+  content: "";
+  position: absolute;
+  top: 8%;
+  bottom: 8%;
+  left: 50%;
+  width: 1px;
+  background: linear-gradient(to bottom,
+    transparent, var(--line) 18%, var(--line) 82%, transparent);
+  opacity: .45;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* 大屏限宽居中：通过 #stage 的 max-width 实现，
+   这样 #book 依然是 #stage 全宽，translate 步长计算保持简单可靠 */
+@media (min-width: 48rem) {
+  [data-layout="paginated"] #stage {
+    max-width: calc(var(--page-width) + var(--pad-x) * 2);
+    margin: 0 auto;
+  }
+}
+
+/* ══════════ 滚动模式 ══════════ */
+[data-layout="scroll"] #stage { overflow: hidden; }
+
+[data-layout="scroll"] #book {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--pad-y) var(--pad-x) 6rem;
+  transform: none !important;
+  transition: none;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+[data-layout="scroll"] .chapter {
+  max-width: var(--page-width);
+  margin: 0 auto;
+  padding-bottom: 2.5rem;
+}
+[data-layout="scroll"] #stage::before { display: none; }
+[data-layout="scroll"] .book-end { max-width: var(--page-width); margin-inline: auto; }
+
+/* ══════════ 页码 ══════════ */
+#pageinfo {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom) + .6rem);
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: .72rem;
+  letter-spacing: .14em;
+  color: var(--fg-faint);
+  pointer-events: none;
+  z-index: 6;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  transition: opacity var(--ui-dur) var(--ease-out), transform var(--ui-dur) var(--ease-out);
+  font-variant-numeric: tabular-nums;
+}
+/* 展开工具栏时页码上移让位；沉浸时淡出 */
+[data-ui="immersive"] #pageinfo { opacity: .32; }
+body[data-toolbar="open"] #pageinfo { transform: translateY(-3.6rem); opacity: 1; }
+[data-layout="scroll"] #pageinfo { display: none; }
+
+/* ══════════ 沉浸开关（唯一常驻控件 · 右上角） ══════════ */
+#immersiveToggle {
+  position: fixed;
+  right: calc(env(safe-area-inset-right) + 1rem);
+  top: calc(env(safe-area-inset-top) + 1rem);
+  width: 2.6rem;
+  height: 2.6rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  z-index: 55;
+  /* 极淡：平时几乎看不见，不干扰阅读 */
+  opacity: .18;
+  background: transparent;
+  transition: opacity .3s var(--ease-out), transform .3s var(--ease-out),
+              background .3s var(--ease-out);
+  touch-action: none;
+}
+/* 圆点本体 */
+#immersiveToggle .dot-core {
+  width: .5rem;
+  height: .5rem;
+  border-radius: 50%;
+  background: var(--fg-soft);
+  transition: all .3s var(--ease-out);
+}
+/* 悬停 / 按键反馈（桌面端） */
+@media (hover: hover) {
+  #immersiveToggle:hover { opacity: .6; }
+}
+/* 按下时明确反馈 */
+#immersiveToggle.is-pressing { opacity: .85; transform: scale(.88); }
+/* 展开状态下圆点变成更明显的一枚小胶囊，提示"可收起" */
+body[data-toolbar="open"] #immersiveToggle { opacity: .5; }
+body[data-toolbar="open"] #immersiveToggle .dot-core {
+  width: 1rem;
+  height: .28rem;
+  border-radius: .2rem;
+}
+/* 阅读中有互动时短暂提高可见度，随后自动回落（由 JS 控制 class） */
+#immersiveToggle.is-awake { opacity: .55; }
+
+/* 防止小圆点挡住内容：小屏时贴近边缘 */
+@media (max-width: 480px) {
+  #immersiveToggle { right: calc(env(safe-area-inset-right) + .75rem); }
+}
+
+/* ══════════ 底部工具栏 ══════════ */
+#toolbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3.2rem;
+  padding: .5rem 1rem calc(env(safe-area-inset-bottom) + .5rem);
+  background: color-mix(in srgb, var(--panel) 90%, transparent);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-top: 1px solid var(--line);
+  transform: translateY(0);
+  transition: transform var(--ui-dur) var(--ease-out), opacity var(--ui-dur) var(--ease-out);
+}
+body[data-toolbar="closed"] #toolbar {
+  transform: translateY(120%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tb-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .12rem;
+  min-width: 3.6rem;
+  padding: .32rem .45rem;
+  border-radius: .6rem;
+  font-size: .66rem;
+  letter-spacing: .02em;
+  color: var(--fg-soft);
+  transition: background .18s, color .18s;
+}
+.tb-btn svg {
+  width: 1.3rem;
+  height: 1.3rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.tb-btn:active { background: var(--accent-sf); color: var(--accent); }
+
+/* ══════════ 抽屉 ══════════ */
+.drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: min(20rem, 86vw);
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  transition: transform .38s var(--ease-out);
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  will-change: transform;
+}
+.drawer-left  { left: 0;  transform: translateX(-102%); }
+.drawer-right { right: 0; transform: translateX(102%); }
+.drawer.is-open { transform: translateX(0); }
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.1rem .8rem;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.drawer-head h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+.drawer-close {
+  font-size: 1.5rem;
+  line-height: 1;
+  width: 2rem; height: 2rem;
+  display: grid; place-items: center;
+  border-radius: .5rem;
+  color: var(--fg-faint);
+}
+.drawer-close:active { background: var(--accent-sf); }
+
+.drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 1rem 1.1rem 3rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+}
+
+/* ══════════ 目录 ══════════ */
+.toc-meta {
+  padding-bottom: .85rem;
+  margin-bottom: .35rem;
+  border-bottom: 1px solid var(--line);
+}
+.toc-book {
+  margin: 0 0 .3rem;
+  font-size: .95rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.toc-author { margin: 0 0 .35rem; font-size: .8rem; color: var(--fg-soft); }
+.toc-stat {
+  margin: 0;
+  font-size: .72rem;
+  line-height: 1.4;
+  color: var(--fg-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 序号列定宽右对齐 + 标题列左对齐成栅格：
+   两位数序号不会把标题顶歪，长标题换行后悬挂对齐在标题列 */
+.toc-list { display: flex; flex-direction: column; }
+.toc-item {
+  display: grid;
+  grid-template-columns: 1.5rem 1fr;
+  align-items: baseline;
+  gap: .7rem;
+  width: 100%;
+  min-height: 2.6rem;
+  padding: .58rem .6rem;
+  text-align: left;
+  border-radius: .5rem;
+  font-size: .85rem;
+  line-height: 1.45;
+  color: var(--fg-soft);
+  transition: background .18s, color .18s;
+}
+.toc-item:active { background: var(--accent-sf); }
+.toc-item.is-current {
+  background: var(--accent-sf);
+  color: var(--accent);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.toc-num {
+  font-size: .7rem;
+  color: var(--fg-faint);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.toc-item.is-current .toc-num { color: var(--accent); }
+
+/* ══════════ 设置项 ══════════ */
+/* 标签列定宽 + 控件列自适应：每行左边缘与控件左边缘都落在同一条栅格线上 */
+.set-group {
+  display: grid;
+  grid-template-columns: 4.2rem 1fr;
+  align-items: center;
+  gap: .4rem .7rem;
+  padding: .7rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.set-group:last-of-type { border-bottom: 0; }
+.set-group h4 {
+  margin: 0;
+  font-size: .76rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--fg-soft);
+}
+.set-hint {
+  display: block;
+  margin-top: .1rem;
+  font-size: .68rem;
+  color: var(--fg-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.seg {
+  display: flex;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: .62rem;
+  padding: 3px;
+  gap: 3px;
+}
+.seg-btn {
+  flex: 1;
+  padding: .48rem .3rem;
+  border-radius: .45rem;
+  font-size: .79rem;
+  color: var(--fg-soft);
+  transition: background .18s, color .18s, box-shadow .18s;
+  white-space: nowrap;
+}
+.seg-btn.is-active {
+  background: var(--panel);
+  color: var(--accent);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .1);
+}
+[data-theme="night"] .seg-btn.is-active { background: #2b3038; box-shadow: none; }
+
+.seg-theme .seg-btn { font-size: .76rem; }
+.seg-theme .theme-day   { background: #fbf8f2; color: #2b2622; }
+.seg-theme .theme-sepia { background: #f3e6cd; color: #3b2f1f; }
+.seg-theme .theme-night { background: #22252b; color: #cbcdd2; }
+.seg-theme .seg-btn.is-active { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.stepper { display: flex; align-items: center; gap: .7rem; }
+.step-btn {
+  flex: none;
+  min-width: 2.9rem;
+  padding: .48rem .5rem;
+  border: 1px solid var(--line);
+  border-radius: .55rem;
+  font-size: .82rem;
+  text-align: center;
+  transition: background .18s, color .18s;
+}
+.step-btn.step-big { font-size: 1rem; }
+.step-btn:active { background: var(--accent-sf); color: var(--accent); }
+.step-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--line);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.step-bar span {
+  display: block;
+  height: 100%;
+  width: 50%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width .2s ease;
+}
+
+.set-version {
+  margin: 1.4rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+  font-size: .7rem;
+  line-height: 1.6;
+  color: var(--fg-faint);
+  text-align: center;
+}
+
+/* ══════════ 遮罩 ══════════ */
+#scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  background: var(--scrim);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .32s var(--ease-out);
+}
+body[data-drawer="open"] #scrim { opacity: 1; pointer-events: auto; }
+
+/* ══════════ 轻提示 ══════════ */
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 5rem);
+  z-index: 100;
+  transform: translate(-50%, .8rem);
+  padding: .62rem 1.05rem;
+  background: color-mix(in srgb, var(--fg) 90%, transparent);
+  color: var(--bg);
+  border-radius: 2rem;
+  font-size: .8rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .24s ease, transform .24s ease;
+  max-width: 82vw;
+  text-align: center;
+  backdrop-filter: blur(8px);
+}
+#toast.is-open { opacity: 1; transform: translate(-50%, 0); }
+
+/* ══════════ 大屏适配 ══════════ */
+@media (min-width: 48rem) {
+  :root { --pad-x: 3.5rem; --pad-y: 3.5rem; }
+  [data-layout="scroll"] #stage { max-width: 62rem; margin: 0 auto; }
+  .drawer { width: 22rem; }
+}
+
+/* 横屏：压缩纵向留白 */
+@media (orientation: landscape) and (max-height: 30rem) {
+  :root { --pad-y: 1.1rem; }
+  .chapter-head { margin-bottom: 1rem; }
+}
+
+/* ══════════ 打印 ══════════ */
+@media print {
+  html, body { overflow: visible; background: #fff; color: #000; }
+  #progressbar, #toolbar, #pageinfo, .drawer, #scrim,
+  #toast, #immersiveToggle { display: none !important; }
+  #viewport { position: static; display: block; }
+  #stage { height: auto; overflow: visible; }
+  #book { height: auto; transform: none !important; padding: 0; }
+  .chapter { break-before: page; }
+}
+
+/* ══════════ 减少动效偏好 ══════════ */
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}

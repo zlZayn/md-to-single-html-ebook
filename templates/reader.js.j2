@@ -1,0 +1,754 @@
+/* ═══════════════════════════════════════════════════════════════
+   单文件电子书阅读器 · 交互逻辑
+   模块：Store → 文本偏移 → Paginator → Progress → Settings → UI
+        → Pager（点击翻页） → 启动
+   ═══════════════════════════════════════════════════════════════ */
+(function () {
+  "use strict";
+
+  const $  = (sel, root) => (root || document).querySelector(sel);
+  const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+  function debounce(fn, wait) {
+    let t = null;
+    return function (...a) {
+      clearTimeout(t);
+      t = setTimeout(() => fn.apply(null, a), wait);
+    };
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     1. Store
+     ═══════════════════════════════════════════════════════════ */
+
+  const BOOK = JSON.parse($("#bookdata").textContent);
+  const NS = "dsh-reader:" + BOOK.slug + ":";
+
+  const DEFAULTS = {
+    theme: "day",
+    layout: "paginated",     // paginated | scroll
+    style: "book",           // book | modern
+    fontSize: 18,
+    lineHeight: "1.85",
+    fontFamily: "serif",
+    pageWidth: "normal",
+  };
+
+  const FONT_MIN = 14, FONT_MAX = 30, FONT_STEP = 2;
+  const PAGE_WIDTHS = { narrow: "30rem", normal: "34rem", wide: "42rem" };
+
+  const Store = {
+    _get(key, fb) {
+      try {
+        const raw = localStorage.getItem(NS + key);
+        return raw === null ? fb : JSON.parse(raw);
+      } catch (e) { return fb; }
+    },
+    _set(key, val) {
+      try { localStorage.setItem(NS + key, JSON.stringify(val)); } catch (e) {}
+    },
+    getSettings() { return Object.assign({}, DEFAULTS, this._get("settings", {})); },
+    setSettings(s) { this._set("settings", s); },
+    getProgress() { return this._get("progress", 0); },
+    setProgress(r) { this._set("progress", clamp(r, 0, 1)); },
+  };
+
+  /* ═══════════════════════════════════════════════════════════
+     2. 文本偏移索引 —— 阅读位置以"全文字符偏移"表示，与分页解耦
+     ═══════════════════════════════════════════════════════════ */
+
+  let domIndex = null;
+
+  function buildDomIndex() {
+    const walker = document.createTreeWalker($("#book"), NodeFilter.SHOW_TEXT, {
+      acceptNode(n) {
+        return n.nodeValue && n.nodeValue.trim()
+          ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      },
+    });
+    const nodes = [], starts = [];
+    let total = 0, node;
+    while ((node = walker.nextNode())) {
+      nodes.push(node);
+      starts.push(total);
+      total += node.nodeValue.length;
+    }
+    domIndex = { nodes, starts, total };
+    return domIndex;
+  }
+
+  const getDomIndex = () => domIndex || buildDomIndex();
+
+  function toGlobalOffset(node, offsetInNode) {
+    const idx = getDomIndex();
+    const i = idx.nodes.indexOf(node);
+    return i < 0 ? 0 : idx.starts[i] + offsetInNode;
+  }
+
+  function fromGlobalOffset(g) {
+    const idx = getDomIndex();
+    if (!idx.nodes.length) return null;
+    const v = clamp(g, 0, idx.total);
+    let lo = 0, hi = idx.starts.length - 1, found = 0;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (idx.starts[mid] <= v) { found = mid; lo = mid + 1; }
+      else hi = mid - 1;
+    }
+    return { node: idx.nodes[found], offset: v - idx.starts[found] };
+  }
+
+  function chapterAtOffset(g) {
+    const pos = fromGlobalOffset(g);
+    if (!pos) return 0;
+    const sec = pos.node.parentElement.closest(".chapter");
+    return sec ? +sec.dataset.index : 0;
+  }
+
+  /** 记录当前阅读位置，返回全文字符偏移 */
+  function captureAnchor() {
+    if (document.documentElement.dataset.layout === "scroll") {
+      const book = $("#book");
+      const top = book.getBoundingClientRect().top;
+      const idx = getDomIndex();
+      for (let i = 0; i < idx.nodes.length; i++) {
+        const r = idx.nodes[i].parentElement.getBoundingClientRect();
+        if (r.bottom > top + 8) return { offset: idx.starts[i] };
+      }
+      return { offset: idx.total };
+    }
+    return { offset: Paginator.offsetAtPage(Paginator.page) };
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     3. Paginator —— CSS 多列分页
+     ═══════════════════════════════════════════════════════════ */
+
+  const Paginator = {
+    page: 0,
+    step: 0,
+    total: 1,
+    offsets: [],
+    _pinnedChapter: null,
+    _pinSettled: true,
+
+    measure() {
+      const book = $("#book");
+      const cs = getComputedStyle(book);
+      const gap = parseFloat(cs.columnGap) || 0;
+
+      // column-width 不接受百分比，必须先按容器实测宽度注入绝对长度
+      const colW = book.clientWidth;
+      document.documentElement.style.setProperty("--col-w", colW + "px");
+      void book.offsetWidth;   // 强制回流后再读 scrollWidth
+
+      this.step = book.clientWidth + gap;
+      this.total = Math.max(1, Math.round((book.scrollWidth + gap) / this.step));
+
+      this._buildOffsets();
+      this.page = clamp(this.page, 0, this.total - 1);
+      this.apply(0);
+      return cs;
+    },
+
+    /** 建「页 ↔ 字符偏移」换算表 */
+    _buildOffsets() {
+      const book = $("#book");
+      const idx = getDomIndex();
+      const bookLeft = book.getBoundingClientRect().left;
+
+      const colOf = idx.nodes.map((n) => {
+        const r = n.parentElement.getBoundingClientRect();
+        return Math.floor((r.left - bookLeft + 1) / this.step);
+      });
+
+      const offsets = [];
+      for (let p = 0; p < this.total; p++) {
+        let start = idx.total;
+        for (let i = 0; i < colOf.length; i++) {
+          if (colOf[i] >= p) { start = idx.starts[i]; break; }
+        }
+        offsets.push(start);
+      }
+      offsets[0] = 0;
+      offsets.push(idx.total);   // 哨兵
+      this.offsets = offsets;
+    },
+
+    pageAtOffset(offset) {
+      const offs = this.offsets;
+      if (!offs.length) return 0;
+      let lo = 0, hi = offs.length - 2, found = 0;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (offs[mid] <= offset) { found = mid; lo = mid + 1; }
+        else hi = mid - 1;
+      }
+      return clamp(found, 0, this.total - 1);
+    },
+
+    offsetAtPage(p) {
+      const offs = this.offsets;
+      return offs.length ? offs[clamp(p, 0, offs.length - 2)] : 0;
+    },
+
+    /** 定位某章正文开始的那一页。
+        章节标题的偏移常落在上一页尾部（标题前有留白），
+        直接反推会错位到上一章，故用标题的实际视觉列号校验修正。 */
+    pageOfChapter(index) {
+      const section = $('.chapter[data-index="' + index + '"]');
+      if (!section) return 0;
+
+      const heading = section.querySelector(".chapter-title");
+      let page = 0;
+      if (heading) {
+        const w = document.createTreeWalker(heading, NodeFilter.SHOW_TEXT);
+        const tn = w.nextNode();
+        const off = tn ? toGlobalOffset(tn, 0) : 0;
+        page = this.pageAtOffset(off);
+
+        const bookLeft = $("#book").getBoundingClientRect().left;
+        const col = Math.floor((heading.getBoundingClientRect().left - bookLeft + 1) / this.step);
+        if (col > page) page = col;
+      }
+      return clamp(page, 0, this.total - 1);
+    },
+
+    /** 应用位移。offset 为额外像素偏移（默认 0） */
+    apply(offset, animate) {
+      const book = $("#book");
+      const x = -this.page * this.step + (offset || 0);
+      if (animate === false) {
+        book.style.transition = "none";
+        book.style.transform = "translate3d(" + x + "px,0,0)";
+        void book.offsetWidth;
+        book.style.transition = "";
+      } else {
+        book.style.transform = "translate3d(" + x + "px,0,0)";
+      }
+      this._updateInfo();
+      UI.syncChapterUI();
+    },
+
+    goto(p, animate) {
+      const next = clamp(p, 0, this.total - 1);
+      if (typeof this._pinnedChapter === "number" && this._pinSettled) {
+        if (chapterAtOffset(this.offsetAtPage(next)) !== this._pinnedChapter) {
+          this._pinnedChapter = null;
+        }
+      }
+      if (next === this.page) { this.apply(0, animate); return; }
+      this.page = next;
+      this.apply(0, animate);
+      Progress.save();
+    },
+
+    next() { this.goto(this.page + 1); },
+    prev() { this.goto(this.page - 1); },
+
+    gotoChapter(index) {
+      const section = $('.chapter[data-index="' + index + '"]');
+      if (!section) return;
+
+      if (document.documentElement.dataset.layout === "scroll") {
+        section.scrollIntoView({ behavior: "smooth", block: "start" });
+        UI.syncChapterUI();
+        Progress.saveSoon();
+        return;
+      }
+      const target = this.pageOfChapter(index);
+      this._pinnedChapter = index;
+      this._pinSettled = false;
+      if (target === this.page) {
+        UI.syncChapterUI();
+        Progress.save();
+      } else {
+        this.goto(target);
+      }
+      requestAnimationFrame(() => { this._pinSettled = true; });
+    },
+
+    /** 重排：记住字符位置 → 重新测量 → 回到同一处 */
+    reflow() {
+      const anchor = captureAnchor();
+      requestAnimationFrame(() => {
+        this.measure();
+        this.goto(this.pageAtOffset(anchor.offset), false);
+        const idx = getDomIndex();
+        Progress.updateBar(idx.total ? anchor.offset / idx.total : 0);
+      });
+    },
+
+    scheduleReflow() { debounce(() => this.reflow(), 70)(); },
+
+    _updateInfo() {
+      if (document.documentElement.dataset.layout !== "paginated") return;
+      $("#pageinfo").textContent = (this.page + 1) + " / " + this.total;
+    },
+  };
+
+  /* ═══════════════════════════════════════════════════════════
+     4. Progress
+     ═══════════════════════════════════════════════════════════ */
+
+  const Progress = {
+    _ratio: 0,
+    updateBar(ratio) {
+      if (typeof ratio === "number") this._ratio = clamp(ratio, 0, 1);
+      $("#progressfill").style.width = (this._ratio * 100).toFixed(2) + "%";
+    },
+    save() {
+      const a = captureAnchor();
+      const idx = getDomIndex();
+      this._ratio = idx.total ? a.offset / idx.total : 0;
+      Store.setProgress(this._ratio);
+      this.updateBar(this._ratio);
+    },
+    saveSoon: debounce(function () { Progress.save(); }, 400),
+    restore() {
+      const ratio = Store.getProgress();
+      this._ratio = ratio;
+      this.updateBar(ratio);
+      if (ratio <= 0) return;
+      const idx = getDomIndex();
+      const target = ratio * idx.total;
+      if (document.documentElement.dataset.layout === "scroll") {
+        const pos = fromGlobalOffset(target);
+        if (pos) {
+          const r = pos.node.parentElement.getBoundingClientRect();
+          $("#book").scrollTop += r.top - $("#book").getBoundingClientRect().top - 12;
+        }
+      } else {
+        Paginator.goto(Paginator.pageAtOffset(target), false);
+      }
+    },
+  };
+
+  /* ═══════════════════════════════════════════════════════════
+     5. Settings
+     ═══════════════════════════════════════════════════════════ */
+
+  let settings = Store.getSettings();
+
+  const Settings = {
+    get() { return settings; },
+    apply(patch) {
+      const prevLayout = settings.layout;
+      Object.assign(settings, patch || {});
+      Store.setSettings(settings);
+      this._paint();
+      const touched = ["fontSize", "lineHeight", "fontFamily", "pageWidth", "style", "layout"];
+      if (touched.some((k) => k in patch)) {
+        if (prevLayout !== settings.layout) requestAnimationFrame(() => Paginator.reflow());
+        else Paginator.scheduleReflow();
+      }
+    },
+    _paint() {
+      const root = document.documentElement;
+      root.dataset.theme = settings.theme;
+      root.dataset.layout = settings.layout;
+      root.dataset.style = settings.style;
+      root.dataset.fontfamily = settings.fontFamily;
+      root.style.setProperty("--font-size", settings.fontSize + "px");
+      root.style.setProperty("--line-height", settings.lineHeight);
+      root.style.setProperty("--page-width", PAGE_WIDTHS[settings.pageWidth] || PAGE_WIDTHS.normal);
+
+      const meta = $('meta[name="theme-color"]');
+      if (meta) {
+        const bg = getComputedStyle(root).getPropertyValue("--bg").trim();
+        meta.setAttribute("content", bg || "#f6f1e7");
+      }
+
+      $$("[data-setting]").forEach((btn) => {
+        btn.classList.toggle("is-active",
+          String(settings[btn.dataset.setting]) === btn.dataset.value);
+      });
+
+      const pct = ((settings.fontSize - FONT_MIN) / (FONT_MAX - FONT_MIN)) * 100;
+      $("#fontSizeBar").style.width = clamp(pct, 4, 100) + "%";
+      $("#fontSizeHint").textContent = settings.fontSize + "px";
+    },
+    step(key, delta) {
+      if (key === "fontSize") {
+        const next = clamp(settings.fontSize + delta * FONT_STEP, FONT_MIN, FONT_MAX);
+        if (next === settings.fontSize) {
+          UI.toast(next >= FONT_MAX ? "已是最大字号" : "已是最小字号");
+          return;
+        }
+        this.apply({ fontSize: next });
+      }
+    },
+  };
+
+  /* ═══════════════════════════════════════════════════════════
+     6. UI —— 沉浸开关 / 工具栏 / 抽屉 / 全屏 / 提示
+     ═══════════════════════════════════════════════════════════ */
+
+  const UI = {
+    _toastTimer: null,
+    _awakeTimer: null,
+    immersive: true,     // 默认沉浸：只留正文
+
+    /** 展开 / 收起工具栏。入口只有两个：右上角小圆点、Esc 键。
+        正文区点击不接线到这里，避免误弹底部菜单。 */
+    toggleToolbar() {
+      document.body.dataset.toolbar =
+        document.body.dataset.toolbar === "open" ? "closed" : "open";
+      // 收起工具栏时若抽屉开着，一并关掉
+      if (document.body.dataset.toolbar === "closed") this.closeDrawers();
+    },
+
+    openToolbar() { document.body.dataset.toolbar = "open"; },
+    closeToolbar() { document.body.dataset.toolbar = "closed"; },
+
+    /** 沉浸开关：轻点小圆点 → 切换"只留正文"与"展开工具栏"，
+        同时尝试进入/退出浏览器全屏（隐藏地址栏） */
+    toggleImmersive() {
+      const expanding = document.body.dataset.toolbar !== "open";
+      document.body.dataset.toolbar = expanding ? "open" : "closed";
+      if (!expanding) this.closeDrawers();
+      this._syncFullscreen(expanding);
+      this.awaken();
+      this.toast(expanding ? "工具栏已展开" : "沉浸阅读", 1100);
+    },
+
+    _syncFullscreen(enter) {
+      const el = document.documentElement;
+      try {
+        if (enter) {
+          if (!document.fullscreenElement && el.requestFullscreen) {
+            el.requestFullscreen().catch(() => {});
+          }
+          if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock("portrait").catch(() => {});
+          }
+        } else {
+          if (document.fullscreenElement && document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+          }
+        }
+      } catch (e) { /* iOS 不支持全屏 API，静默降级 */ }
+    },
+
+    /** 让圆点短暂显现，随后自动变淡。
+        只在"需要用户注意这个开关"的时机调用（首次进入、展开工具栏）——
+        不要绑到翻页或触摸上，否则每次点击都会闪一下，反而干扰阅读。 */
+    awaken() {
+      const dot = $("#immersiveToggle");
+      if (!dot) return;
+      dot.classList.add("is-awake");
+      clearTimeout(this._awakeTimer);
+      this._awakeTimer = setTimeout(() => dot.classList.remove("is-awake"), 1600);
+    },
+
+    openDrawer(which) {
+      const sel = { toc: "#tocDrawer", settings: "#settingsDrawer" }[which];
+      if (!sel) return;
+      const el = $(sel);
+      if (!el) return;
+      this.openToolbar();
+      $$(".drawer").forEach((d) => {
+        d.classList.remove("is-open");
+        d.setAttribute("aria-hidden", "true");
+      });
+      el.classList.add("is-open");
+      el.setAttribute("aria-hidden", "false");
+      document.body.dataset.drawer = "open";
+      if (which === "toc") this.syncChapterUI();
+    },
+
+    closeDrawers() {
+      $$(".drawer").forEach((d) => {
+        d.classList.remove("is-open");
+        d.setAttribute("aria-hidden", "true");
+      });
+      document.body.dataset.drawer = "closed";
+    },
+
+    syncChapterUI() {
+      const idx = currentChapterIndex();
+      $$(".toc-item").forEach((it) => {
+        it.classList.toggle("is-current", +it.dataset.tocIndex === idx);
+      });
+    },
+
+    toast(msg, ms) {
+      const el = $("#toast");
+      el.textContent = msg;
+      el.classList.add("is-open");
+      clearTimeout(this._toastTimer);
+      this._toastTimer = setTimeout(() => el.classList.remove("is-open"), ms || 1800);
+    },
+  };
+
+  function currentChapterIndex() {
+    if (document.documentElement.dataset.layout === "scroll") {
+      const book = $("#book");
+      const top = book.getBoundingClientRect().top + 60;
+      let cur = 0;
+      for (const s of $$(".chapter")) {
+        if (s.getBoundingClientRect().top <= top) cur = +s.dataset.index;
+        else break;
+      }
+      return cur;
+    }
+    if (typeof Paginator._pinnedChapter === "number") return Paginator._pinnedChapter;
+    return chapterAtOffset(Paginator.offsetAtPage(Paginator.page));
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     7. Pager —— 点击翻页 + 方向反馈
+     设计要点：
+       · 只保留点击（中轴线左右半屏）与键盘翻页，不做拖拽手势
+       · 翻页动画由一次 transform 过渡完成，cubic-bezier 收尾自然
+       · 翻页瞬间给一条边缘光影，方向可视化，不依赖手指位移
+     ═══════════════════════════════════════════════════════════ */
+
+  const Pager = {
+    _lock: 0,          // 连点合并窗口，避免一次点击触发两页
+    _hintTimer: null,
+
+    /** 翻页并给出方向提示 */
+    go(delta) {
+      if (delta === 0) return;
+      if (document.documentElement.dataset.layout !== "paginated") return;
+
+      const now = Date.now();
+      if (now - this._lock < 90) return;   // 90ms 内的重复点击直接吞掉
+      this._lock = now;
+
+      const target = clamp(Paginator.page + delta, 0, Paginator.total - 1);
+      if (target === Paginator.page) {
+        // 已到首/末页：给一次"顶到边"的反馈，而不是静默无响应
+        this.bump(delta);
+        UI.toast(delta > 0 ? "已是最后一页" : "已是第一页", 1000);
+        return;
+      }
+      Paginator.goto(target);
+      this.hint(delta);
+    },
+
+    next() { this.go(1); },
+    prev() { this.go(-1); },
+
+    /** 边缘光影：翻页瞬间从对应方向扫过，替代拖拽的跟手感 */
+    hint(delta) {
+      const el = $("#pagehint");
+      if (!el) return;
+      el.dataset.dir = delta > 0 ? "next" : "prev";
+      el.classList.remove("is-on");
+      void el.offsetWidth;         // 强制回流，让动画可重入
+      el.classList.add("is-on");
+      clearTimeout(this._hintTimer);
+      this._hintTimer = setTimeout(() => el.classList.remove("is-on"), 420);
+    },
+
+    /** 到顶/到底时的轻微回弹 */
+    bump(delta) {
+      const book = $("#book");
+      const nudge = delta > 0 ? -14 : 14;
+      book.style.transition = "transform .16s ease-out";
+      book.style.transform = "translate3d(" + (-Paginator.page * Paginator.step + nudge) + "px,0,0)";
+      setTimeout(() => {
+        book.style.transition = "";
+        Paginator.apply(0, true);
+      }, 160);
+    },
+  };
+
+  /* ═══════════════════════════════════════════════════════════
+     8. 点击分区与快捷键
+     ═══════════════════════════════════════════════════════════ */
+
+  function initGestures() {
+    const vp = $("#viewport");
+
+    /* 屏幕中轴线左右分区点击：左半屏上一页、右半屏下一页。
+       不存在中间态——工具栏只由右上角小圆点开关，点击正文区永不弹菜单。
+       触屏走 touchend（判点击），鼠标走 click，两者共用同一套坐标判定。 */
+    function handleTap(x) {
+      if (document.body.dataset.drawer === "open") { UI.closeDrawers(); return; }
+
+      // 滚动模式没有"页"的概念，左右分区不翻页，交给纵向滚动
+      if (document.documentElement.dataset.layout !== "paginated") return;
+
+      if (x < window.innerWidth / 2) Pager.prev();
+      else Pager.next();
+    }
+
+    /* 触摸：只识别"轻点"，移动超过阈值即视为滑动/选词，不再当作点击 */
+    let tapCandidate = null;
+
+    vp.addEventListener("touchstart", (e) => {
+      if (e.touches.length !== 1) { tapCandidate = null; return; }
+      const t = e.touches[0];
+      tapCandidate = { x: t.clientX, y: t.clientY, t: e.timeStamp || Date.now() };
+    }, { passive: true });
+
+    vp.addEventListener("touchmove", (e) => {
+      if (!tapCandidate) return;
+      const t = e.touches[0];
+      if (Math.abs(t.clientX - tapCandidate.x) > 10 ||
+          Math.abs(t.clientY - tapCandidate.y) > 10) {
+        tapCandidate = null;           // 移动了，就不算点击
+      }
+    }, { passive: true });
+
+    vp.addEventListener("touchend", (e) => {
+      if (!tapCandidate) return;
+      const t = e.changedTouches && e.changedTouches[0];
+      const dt = (e.timeStamp || Date.now()) - tapCandidate.t;
+      tapCandidate = null;
+      if (t && dt < 500) handleTap(t.clientX);
+    }, { passive: true });
+
+    vp.addEventListener("touchcancel", () => { tapCandidate = null; }, { passive: true });
+
+    // 鼠标：无触摸能力时启用（触屏浏览器里 touchend 已经处理过，避免重复触发）
+    if (!("ontouchstart" in window)) {
+      vp.addEventListener("click", (e) => {
+        if (e.target.closest("#toolbar, .drawer, #immersiveToggle, #toast")) return;
+        if (document.body.dataset.drawer === "open") { UI.closeDrawers(); return; }
+        handleTap(e.clientX);
+      });
+    }
+
+    // 双击缩放抑制
+    document.addEventListener("dblclick", (e) => e.preventDefault(), { passive: false });
+
+    // 键盘
+    document.addEventListener("keydown", (e) => {
+      if (e.target.matches("input, textarea")) return;
+      const paginated = document.documentElement.dataset.layout === "paginated";
+      switch (e.key) {
+        case "ArrowRight": case "PageDown":
+          if (paginated) Pager.next(); break;
+        case "ArrowLeft": case "PageUp":
+          if (paginated) Pager.prev(); break;
+        case " ":
+          if (paginated) { e.preventDefault(); Pager.next(); } break;
+        case "Home":
+          paginated ? Paginator.goto(0) : $("#book").scrollTo({ top: 0 }); break;
+        case "End":
+          paginated ? Paginator.goto(Paginator.total - 1)
+                    : $("#book").scrollTo({ top: $("#book").scrollHeight }); break;
+        case "f": case "F":
+          UI.toggleImmersive(); break;
+        case "Escape":
+          UI.closeDrawers();
+          if (document.body.dataset.toolbar === "open") UI.closeToolbar();
+          break;
+      }
+    });
+
+    // 视口变化重排
+    window.addEventListener("resize", debounce(() => Paginator.reflow(), 180));
+    window.addEventListener("orientationchange", () => setTimeout(() => Paginator.reflow(), 320));
+
+    // 滚动模式：进度与章节同步
+    $("#book").addEventListener("scroll", () => {
+      if (document.documentElement.dataset.layout !== "scroll") return;
+      UI.syncChapterUI();
+      Progress.saveSoon();
+    }, { passive: true });
+
+    window.addEventListener("beforeunload", () => Progress.save());
+    document.addEventListener("visibilitychange", () => { if (document.hidden) Progress.save(); });
+
+    // 全屏状态外部变化时同步标记
+    document.addEventListener("fullscreenchange", () => {
+      document.documentElement.classList.toggle("has-fullscreen", !!document.fullscreenElement);
+    });
+    document.documentElement.classList.toggle("has-fullscreen", !!document.fullscreenEnabled);
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     9. 事件绑定
+     ═══════════════════════════════════════════════════════════ */
+
+  function bindUI() {
+    // 沉浸开关：轻点切换；按下给即时反馈
+    const dot = $("#immersiveToggle");
+    dot.addEventListener("click", (e) => { e.stopPropagation(); UI.toggleImmersive(); });
+    dot.addEventListener("pointerdown", () => dot.classList.add("is-pressing"));
+    ["pointerup", "pointercancel", "pointerleave"].forEach((ev) => {
+      dot.addEventListener(ev, () => dot.classList.remove("is-pressing"));
+    });
+
+    // 工具栏按钮
+    $$("[data-open]").forEach((btn) => {
+      btn.addEventListener("click", () => UI.openDrawer(btn.dataset.open));
+    });
+    $$("[data-close]").forEach((btn) => {
+      btn.addEventListener("click", () => UI.closeDrawers());
+    });
+    $("#scrim").addEventListener("click", () => UI.closeDrawers());
+
+    // 设置项
+    $$("[data-setting]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        Settings.apply({ [btn.dataset.setting]: btn.dataset.value });
+      });
+    });
+    $$("[data-step]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        Settings.step(btn.dataset.step, +btn.dataset.delta);
+      });
+    });
+
+    // 目录项
+    $$("[data-toc-index]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const idx = +btn.dataset.tocIndex;
+        UI.closeDrawers();
+        requestAnimationFrame(() => Paginator.gotoChapter(idx));
+      });
+    });
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     10. 启动
+     ═══════════════════════════════════════════════════════════ */
+
+  function boot() {
+    Settings._paint();
+
+    document.body.dataset.toolbar = "closed";   // 默认沉浸
+    document.body.dataset.drawer = "closed";
+
+    bindUI();
+    buildDomIndex();
+
+    const start = () => {
+      Paginator.measure();
+      Progress.restore();
+      UI.syncChapterUI();
+    };
+
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => requestAnimationFrame(start));
+    } else {
+      requestAnimationFrame(start);
+    }
+
+    initGestures();
+
+    // 首次进入给一次圆点提示，让用户知道那里有个开关
+    setTimeout(() => {
+      UI.awaken();
+      UI.toast("轻点右上圆点可展开工具栏", 2400);
+    }, 900);
+
+    window.__reader = {
+      book: BOOK, store: Store, settings: Settings,
+      paginator: Paginator, progress: Progress, ui: UI, pager: Pager,
+    };
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
+})();
