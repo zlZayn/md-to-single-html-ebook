@@ -8,12 +8,37 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parent
-_TARGETS = sorted((ROOT / "dist").glob("*.html"))
-if not _TARGETS:
-    sys.exit("dist/ 下没有 .html 产物，先跑 generator.py 编译")
-URL = _TARGETS[0].as_uri()
+
+
+def resolve_target() -> Path:
+    """验证目标：命令行显式指定优先，否则取 dist/ 下排序第一个。
+
+    显式指定是为了让 CI 能逐个覆盖全部产物 —— 只跑排序第一个会让
+    其余产物永远得不到验证。
+    """
+    if len(sys.argv) > 1:
+        given = Path(sys.argv[1])
+        if not given.is_file():
+            sys.exit(f"指定的产物不存在：{given}")
+        return given.resolve()
+    targets = sorted((ROOT / "dist").glob("*.html"))
+    if not targets:
+        sys.exit("dist/ 下没有 .html 产物，先跑 generator.py 编译")
+    return targets[0]
+
+
+TARGET = resolve_target()
+URL = TARGET.as_uri()
+print(f"验证目标：{TARGET.name}")
 
 OK, FAIL = [], []
+
+# ── 规格常量 ────────────────────────────────────────────────
+# 模板层的固定约定，与具体书稿无关。书稿相关的量（章数、页数、词数）一律
+# 从产物自身读取或写成相对关系，不许写死 —— 写死会让断言只对某一本书成立，
+# 换一本书就变成假绿或误报。
+TOOLBAR_BUTTONS = 2   # 工具栏按钮：目录 / 设置
+SETTING_GROUPS = 7    # 设置抽屉的分组数
 
 
 def check(name, cond, extra=""):
@@ -73,6 +98,16 @@ with sync_playwright() as pw:
     check("分页已生成", total > 5, f"共 {total} 页")
     check("页码可见", page.inner_text("#pageinfo").strip() != "",
           page.inner_text("#pageinfo").strip())
+
+    # 章数取自注入的结构化数据，不写死（英文书 10 章、中文书 12 章），
+    # 也不去解析渲染后的中文文案 —— 文案格式一变正则就废。
+    # 目录行数、跳章抽样、抽屉行数断言全部以它为基准。
+    chapter_count = page.evaluate("window.__reader.book.chapterCount")
+    check("章数可读", isinstance(chapter_count, (int, float)) and chapter_count > 0,
+          f"{chapter_count} 章")
+    if not chapter_count:
+        sys.exit("产物未声明章数（bookdata 缺失或格式变了），后续断言无法给出可信结论")
+    chapter_count = int(chapter_count)
 
     print("\n【2】点击右侧 → 下一页")
     p0 = page.evaluate("window.__reader.paginator.page")
@@ -204,8 +239,11 @@ with sync_playwright() as pw:
     print("\n【9】目录跳章仍准确")
     page.evaluate("window.__reader.ui.openDrawer('toc')")
     page.wait_for_timeout(400)
+    # 抽样首章、两个三分位、末章：随章数自适应，且保证末章一定被测到。
+    # 原来写死 [0, 3, 6, 9]，隐含「至少 10 章」，末章永远测不到。
+    samples = sorted({0, chapter_count // 3, chapter_count * 2 // 3, chapter_count - 1})
     results = []
-    for idx in [0, 3, 6, 9]:
+    for idx in samples:
         page.evaluate(f"""() => {{
             const b = document.querySelector('[data-toc-index="{idx}"]');
             b.click();
@@ -213,7 +251,7 @@ with sync_playwright() as pw:
         page.wait_for_timeout(420)
         cur = page.evaluate("window.__reader.paginator._pinnedChapter")
         results.append(cur == idx)
-    check("跳章 4/4 精确", all(results), str(results))
+    check(f"跳章 {sum(results)}/{len(results)} 精确", all(results), str(results))
 
     print("\n【10】边界反馈")
     page.evaluate("window.__reader.paginator.goto(0)")
@@ -226,7 +264,7 @@ with sync_playwright() as pw:
 
     print("\n【11】夜间 + 沉浸截图状态")
     page.evaluate("window.__reader.settings.apply({theme:'night'})")
-    page.evaluate("window.__reader.paginator.goto(12)")
+    page.evaluate(f"window.__reader.paginator.goto({max(1, total // 3)})")   # 非首屏即可，不写死页码
     page.evaluate("window.__reader.ui.closeToolbar()")
     page.wait_for_timeout(600)
     check("沉浸式页码可见", page.inner_text("#pageinfo").strip() != "")
@@ -237,8 +275,8 @@ with sync_playwright() as pw:
     page.wait_for_timeout(400)
     check("不再有拖拉条",
           page.evaluate("document.querySelectorAll('#toolbar input, .tb-slider').length") == 0)
-    check("工具栏只剩 2 个按钮",
-          page.evaluate("document.querySelectorAll('#toolbar .tb-btn').length") == 2,
+    check(f"工具栏只剩 {TOOLBAR_BUTTONS} 个按钮",
+          page.evaluate("document.querySelectorAll('#toolbar .tb-btn').length") == TOOLBAR_BUTTONS,
           str(page.evaluate("[...document.querySelectorAll('#toolbar .tb-btn')].map(b => b.textContent.trim())")))
 
     print("\n【13】抽屉排版成栅格")
@@ -246,7 +284,10 @@ with sync_playwright() as pw:
     page.wait_for_timeout(450)
     nums = text_edges(page, ".toc-num")
     titles = text_edges(page, ".toc-title")
-    check("目录 10 行", len(nums) == 10 and len(titles) == 10, f"{len(nums)} 行")
+    # 与产物自身声明的章数比对，不写死：英文书 10 章、中文书 12 章。
+    check("目录行数 = 声明章数",
+          len(nums) == chapter_count and len(titles) == chapter_count,
+          f"{len(nums)} 行 / 声明 {chapter_count} 章")
     check("序号右边缘对齐",
           len({n["right"] for n in nums}) == 1,
           str(sorted({n["right"] for n in nums})))
@@ -266,7 +307,7 @@ with sync_playwright() as pw:
             right: [...new Set(rows.map(r => round(r.children[1].getBoundingClientRect().right)))],
         };
     }""")
-    check("设置 7 组", grid["rows"] == 7, str(grid["rows"]))
+    check(f"设置 {SETTING_GROUPS} 组", grid["rows"] == SETTING_GROUPS, str(grid["rows"]))
     check("标签左边缘同线", len(grid["label"]) == 1, str(grid["label"]))
     check("控件左边缘同线", len(grid["ctrl"]) == 1, str(grid["ctrl"]))
     check("控件右边缘同线", len(grid["right"]) == 1, str(grid["right"]))
@@ -307,3 +348,6 @@ if FAIL:
     for f in FAIL:
         print("  -", f)
 print("=" * 52)
+
+# 有失败项必须返回非零，否则 CI 会假绿。
+sys.exit(1 if FAIL else 0)

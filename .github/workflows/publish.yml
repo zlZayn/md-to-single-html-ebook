@@ -1,0 +1,128 @@
+name: publish
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "content/**"
+      - "templates/**"
+      - "generator.py"
+      - "verify.py"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/publish.yml"
+  workflow_dispatch:
+    inputs:
+      artifact:
+        description: "指定要发布的产物文件名（dist/ 下，含 .html）；留空则按提交时间取最新"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  SITE_DIR: _site
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出（完整历史，供按提交时间排序）
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 安装 uv 与 Python
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12.10"
+          enable-cache: true
+
+      - name: 按 uv.lock 重建环境
+        run: uv sync --frozen
+
+      - name: 安装 chromium
+        run: uv run playwright install --with-deps chromium
+
+      - name: 编译 content/ 全部
+        run: uv run python generator.py
+
+      - name: 校验产物与源码同步
+        run: |
+          if ! git diff --exit-code -- dist/; then
+            echo "::error::dist/ 与 content/ 不同步。请本地重跑 generator.py 并提交产物（产物是模板的唯一备份源）"
+            exit 1
+          fi
+          echo "dist/ 与源码逐字节一致"
+
+      - name: 零外部依赖检查
+        run: |
+          hits=$(grep -oE '(src|href)="https?://[^"]*"' dist/*.html || true)
+          if [ -n "$hits" ]; then
+            echo "::error::产物出现外部资源引用，违反产物零外部依赖约束"
+            echo "$hits"
+            exit 1
+          fi
+          echo "外部资源 0 处"
+
+      - name: 回归验证（逐个产物）
+        run: |
+          for f in dist/*.html; do
+            uv run python verify.py "$f"
+          done
+
+      - name: 挑出发布产物
+        id: pick
+        env:
+          REQUESTED: ${{ github.event.inputs.artifact }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$SITE_DIR"
+
+          if [ -n "$REQUESTED" ]; then
+            target="dist/$REQUESTED"
+            if [ ! -f "$target" ]; then
+              echo "::error::指定的产物不存在：$target"
+              exit 1
+            fi
+            echo "手动指定产物：$target"
+          else
+            target=""
+            best=-1
+            for f in dist/*.html; do
+              t=$(git log -1 --format=%ct -- "$f")
+              t=${t:-0}
+              if [ "$t" -gt "$best" ]; then
+                best="$t"
+                target="$f"
+              fi
+            done
+            echo "按提交时间取最新产物：$target"
+          fi
+
+          cp "$target" "$SITE_DIR/index.html"
+          echo "artifact=$(basename "$target")" >> "$GITHUB_OUTPUT"
+          ls -l "$SITE_DIR"
+
+      - name: 上传 Pages 产物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 发布到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

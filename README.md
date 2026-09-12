@@ -7,6 +7,14 @@
 
 写给写小说和写长文的人：不需要站点，不需要服务器，不需要读者安装任何东西。
 
+## 在线预览
+
+最新产物自动发布在 GitHub Pages：
+
+**https://zlzayn.github.io/md-to-single-html-ebook/**
+
+推到 `main` 后由 [.github/workflows/publish.yml](.github/workflows/publish.yml) 编译、回归、发布。站点入口固定为 `index.html`，永远指向**最近改动的那一本**。
+
 ## 特性
 
 - **编译**：一份 Markdown → 单个 `.html`，样式、脚本、正文全部内联
@@ -32,8 +40,11 @@ uv run python generator.py content/xxx.md -o dist/book.html   # 编译指定文�
 
 ```bash
 uv run playwright install chromium
-uv run python verify.py
+uv run python verify.py                    # 验证 dist/ 下排序第一个产物
+uv run python verify.py dist/逆流.html     # 指定验证哪一份
 ```
+
+有失败项时 `verify.py` 返回非零退出码，可直接挂在 CI 上。
 
 ## 书稿格式
 
@@ -68,11 +79,13 @@ slug: file-name      # 可选，缺省取文件名（支持中文）
 
 ```
 ├── generator.py          # 编译入口：解析 Markdown → 渲染模板 → 输出单文件 HTML
-├── verify.py             # Playwright 回归测试（42 项）
+├── verify.py             # Playwright 回归测试（42 项），可指定验证哪一份产物
 ├── content/              # 书稿源文件（.md）
 ├── dist/                 # 编译产物（.html）
 ├── templates/            # Jinja2 模板：reader.html.j2 / .css.j2 / .js.j2
+├── .github/workflows/    # publish.yml：编译 → 回归 → 发布 GitHub Pages
 ├── docs/ARCHITECTURE.md  # 设计决策与约束
+├── plan/                 # 设计文档
 └── .agents/notes/        # 决策记录
 ```
 
