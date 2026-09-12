@@ -10,6 +10,7 @@
 - **JSON 注入绕过 autoescape**：`Markup()` 包裹 + `< > &` 转 `\uXXXX`，否则 `JSON.parse` 失败。
 - **正文区点击只翻页**：按中轴线分左右半屏，中部不弹菜单；工具栏只能由小圆点开关。
 - **沉浸 = 全屏**：收起工具栏必进全屏，展开工具栏必退全屏，两者成对翻转，不翻一半。
+- **`dist/` 与 `content/` 永不加入 `.gitignore`**：`content/` 是书稿源文件，`dist/` 是编译产物且为模板的唯一备份源（模板丢失时可从产物反推），两者必须入库。`.gitignore` 只忽略运行时产物（`__pycache__/`、`.venv/`、`.DS_Store`、`.workbuddy/` 等）。
 - 每条规则的机制与根因见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 ## 常用命令
