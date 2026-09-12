@@ -5,9 +5,9 @@ on:
     branches: [main]
     paths:
       - "content/**"
-      - "templates/**"
-      - "src/**"
-      - "tests/**"
+      - "templates/*.j2"
+      - "src/*.py"
+      - "tests/*.py"
       - "pyproject.toml"
       - "uv.lock"
       - ".github/workflows/publish.yml"

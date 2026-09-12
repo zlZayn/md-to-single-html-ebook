@@ -32,7 +32,7 @@ gh workflow run publish.yml -f artifact=逆流.html              # 指定产物�
 - 产物：`the-lighthouse-keepers-cat.html` 86.5 KB / 10 章 / 34 页；`逆流.html` 107.0 KB / 12 章。
 - 自包含：外部资源 0 处。可复现：重编译后 `dist/` 逐字节无 diff。
 - 发布链路：push `main` 触发，三道闸门；首跑 build 1m10s / deploy 9s。
-- 链接校验 18 文件 / 62 链接 / 0 错误 0 警告；换行 30 文件 / 0 不一致。
+- 链接校验 20 文件 / 75 链接 / 0 错误 0 警告；换行 32 文件 / 0 不一致。
 - 用例覆盖 → [tests/README.md](tests/README.md)
 
 ## 待办
@@ -62,4 +62,11 @@ gh workflow run publish.yml -f artifact=逆流.html              # 指定产物�
 - [templates/README.md](templates/README.md) — 模板职责与变更影响路由
 - [templates/AGENTS.md](templates/AGENTS.md) — 模板层约束
 - [.agents/notes/](.agents/notes/) — 决策记录
-- [.github/workflows/publish.yml](.github/workflows/publish.yml) — 发布流水线
+- [.github/workflows/README.md](.github/workflows/README.md) — 发布流水线手册；[.github/workflows/AGENTS.md](.github/workflows/AGENTS.md) — 流水线约束
+
+## 文档约定
+
+- 分层：README 门面（怎么用）· AGENTS 规则（怎么工作，自动注入）· ARCHITECTURE 圣经（为什么）· 目录 README 手册（是什么、改哪）。
+- 指针单向向下：子 README 回指根 AGENTS 与 ARCHITECTURE；ARCHITECTURE 不指向子 README。
+- 同一事实只在一个 home 写，别处只放指针。
+- 文档网络由外部的链接校验与换行校验脚本兜底（`check-links.py` / `check-line-endings.py`），改动后各跑一次；跨文档引用一律写成可解析的相对路径。
