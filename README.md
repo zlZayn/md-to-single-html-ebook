@@ -2,6 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.12.10-blue.svg)](.python-version)
+[![publish](https://github.com/zlZayn/md-to-single-html-ebook/actions/workflows/publish.yml/badge.svg)](https://github.com/zlZayn/md-to-single-html-ebook/actions/workflows/publish.yml)
 
 把一份 Markdown 书稿编译成**一个自包含的 HTML 文件**——双击即读，可离线、可发到手机、可当附件传。
 
@@ -9,17 +10,11 @@
 
 ## 在线预览
 
-最新产物自动发布在 GitHub Pages：
+最近在写的那一本会自动发布到 GitHub Pages：
 
 **https://zlzayn.github.io/md-to-single-html-ebook/**
 
-推到 `main` 后由 [.github/workflows/publish.yml](.github/workflows/publish.yml) 编译、回归、发布。站点入口固定为 `index.html`，永远指向**最近改动的那一本**。
-
-发布哪一本由 [pick_artifact.py](pick_artifact.py) 决定：先比产物的提交时间，平局时比 `content/*.md` 的提交时间。要指定：
-
-```bash
-gh workflow run publish.yml -f artifact=逆流.html
-```
+把 `content/` 或 `templates/` 的改动推到 `main` 即可，不需要手动发布。发布机制见 [AGENTS.md](AGENTS.md)。
 
 ## 特性
 
@@ -41,16 +36,6 @@ uv run python generator.py content/xxx.md -o dist/book.html   # 编译指定文�
 ```
 
 产物默认落在 `dist/<slug>.html`，双击即可阅读。
-
-跑回归验证需要 playwright 的 chromium：
-
-```bash
-uv run playwright install chromium
-uv run python verify.py                    # 验证 dist/ 下排序第一个产物
-uv run python verify.py dist/逆流.html     # 指定验证哪一份
-```
-
-有失败项时 `verify.py` 返回非零退出码，可直接挂在 CI 上。
 
 ## 书稿格式
 
@@ -80,21 +65,6 @@ slug: file-name      # 可选，缺省取文件名（支持中文）
 - 产物不含任何外部请求：没有外链样式、外链脚本、远程字体。
 - 阅读进度与偏好只存在本机 `localStorage`，不上传、不跨设备同步。
 - 打开即离线阅读，不依赖网络。
-
-## 项目结构
-
-```
-├── generator.py          # 编译入口：解析 Markdown → 渲染模板 → 输出单文件 HTML
-├── verify.py             # Playwright 回归测试（43 项），可指定验证哪一份产物
-├── pick_artifact.py      # 发布时挑出最新产物，生成站点入口 index.html
-├── content/              # 书稿源文件（.md）
-├── dist/                 # 编译产物（.html）
-├── templates/            # Jinja2 模板：reader.html.j2 / .css.j2 / .js.j2
-├── .github/workflows/    # publish.yml：编译 → 回归 → 发布 GitHub Pages
-├── docs/ARCHITECTURE.md  # 设计决策与约束
-├── plan/                 # 设计文档
-└── .agents/notes/        # 决策记录
-```
 
 ## License
 

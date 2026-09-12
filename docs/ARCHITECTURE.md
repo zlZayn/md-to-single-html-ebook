@@ -40,29 +40,35 @@ Markdown 进，自包含单文件 HTML 出。
 
 - 站点：<https://zlzayn.github.io/md-to-single-html-ebook/>
 - workflow：`.github/workflows/publish.yml`
-- 触发范围：改动落在 `content/`、`templates/`、`generator.py`、`verify.py`、`pyproject.toml`、`uv.lock` 或 workflow 自身。只改文档不触发发布
-- 兜底入口：`workflow_dispatch`，可用 `artifact` 输入手动指定产物
+- 触发范围：改动落在 `content/`、`templates/`、`generator.py`、`pick_artifact.py`、`verify.py`、`pyproject.toml`、`uv.lock` 或 workflow 自身。
+- 只改文档不触发发布。
+- 兜底入口：`workflow_dispatch`，可用 `artifact` 输入手动指定产物。
 
 ### 「最新产物」的判定
 
-`actions/checkout` 把所有文件的 mtime 统一写成检出时刻，`dist/*.html` 的 mtime 在 CI 里全部相等 —— 「取 mtime 最大」在本地成立、在 CI 必然挑错。因此改用提交时间：
+判据是**书稿源 `content/*.md` 的提交时间**，不是产物自己的。
 
-```
-git log -1 --format=%ct -- <path>
-```
+- 产物是渲染结果，任何一次重建都会改写 `dist/*.html`。
+- 产物的提交时间因此恒等于「最后一次重建」，且同一次重建会让所有产物时间相同。
+- 按产物时间选，每次都会退化到平局，与「哪一本最近在动」无关。
+- 只有书稿源的提交时间能反映维护者实际在写哪一本。
 
-并需要 `fetch-depth: 0`（浅克隆拿不到完整历史）。判定优先级（实现见 `pick_artifact.py`）：
+优先级（实现见 `pick_artifact.py`）：
 
-1. **显式指定** —— `--requested <文件名>`，对应 `workflow_dispatch` 的 `artifact` 输入
-2. **产物自身的提交时间最大者**
-3. **平局时取对应 `content/*.md` 的提交时间最大者** —— 一次重建（改模板、CSS、生成器）会同时改动全部产物，平局在本仓库是**常态**，实测首次发布即撞上。源文件时间反映维护者实际在写哪一本，比文件名排序贴近意图
-4. **再平局按文件名升序**，保证结果确定
+1. **显式指定** —— `--requested <文件名>`，对应 `workflow_dispatch` 的 `artifact` 输入。
+2. **对应 `content/*.md` 的提交时间最大者**。
+3. **平局按产物文件名升序**，保证结果确定。
 
-产物到源文件的映射复用 `generator.slugify`，同一套命名规则不在两处各写一份。
+- 时间取自 `git log -1 --format=%ct -- <path>`，需要 `fetch-depth: 0`（浅克隆拿不到完整历史）。
+- 不用 mtime：`actions/checkout` 把所有文件的 mtime 统一写成检出时刻，按 mtime 取必然挑错。
+- 产物到源文件的映射复用 `generator.slugify`，同一套命名规则不在两处各写一份。
+- 判定过程把候选表与选定依据打进日志，线上选错时可回溯。
 
 ### 站点入口固定为 `index.html`
 
-`逆流.html` 直接发布时 URL 会被编码成 `%E9%80%86%E6%B5%81.html`。发布前统一重命名为 `index.html`，站点入口因此恒为根路径，且天然指向最近改动的那一本 —— 这正好实现「只发最新一个」。
+- `逆流.html` 直接发布时 URL 会被编码成 `%E9%80%86%E6%B5%81.html`。
+- 发布前统一重命名为 `index.html`，站点入口恒为根路径。
+- 入口因此天然指向最近改动的那一本，正好实现「只发最新一个」。
 
 ### 三道闸门
 
@@ -72,15 +78,21 @@ git log -1 --format=%ct -- <path>
 | 零外部依赖 | `grep -oE '(src\|href)="https?://[^"]*"' dist/*.html` 无命中 | 外链样式 / 脚本 / 字体混进产物，破坏离线能力 |
 | 全产物回归 | 对 `dist/*.html` **逐个**跑 `verify.py` | 阅读器行为回归 |
 
-闸门只圈 `dist/`，因此本地因 uv 镜像配置改写 `uv.lock` 之类的噪声不会误触。
+闸门只圈 `dist/`，本地因 uv 镜像配置改写 `uv.lock` 之类的噪声不会误触。
 
 ### 发布源是 CI 重编译的结果
 
-流水线不在云端提交任何东西，`dist/` 始终由维护者本地重跑 `generator.py` 后提交。云端重编译只用于验证与发布 —— 这依赖「产物字节可复现」这条约束，两者是绑定的。
+- 流水线不在云端提交任何东西。
+- `dist/` 始终由维护者本地重跑 `generator.py` 后提交。
+- 云端重编译只用于验证与发布，这依赖「产物字节可复现」这条约束。
 
 ### 站点公开性不可配置
 
-已发布站点对任何拿到链接的人公开。仓库可见性与站点可见性是两件独立的事：Free / Pro / Team 都只能在**站点公开**的前提下发布，站点级访问控制只有 Enterprise Cloud 组织的 Pages access control 提供。因此书稿里不得出现密钥或内部信息。
+- 已发布站点对任何拿到链接的人公开。
+- 仓库可见性与站点可见性互相独立。
+- Free / Pro / Team 都只能在站点公开的前提下发布。
+- 站点级访问控制只有 Enterprise Cloud 组织的 Pages access control 提供。
+- 书稿里不得出现密钥或内部信息。
 
 ## 设计决策
 
@@ -189,7 +201,7 @@ epub.js、起点阅读页等成熟方案的共同做法。
 | 按 Esc 退出全屏后停在无工具栏的空档 | 全屏被系统层面改动，工具栏状态没跟上 | 监听 `fullscreenchange`，全屏丢失且工具栏收起时自动展开并唤醒圆点 |
 | 默认沉浸态始终不进全屏 | 浏览器禁止无手势的全屏请求 | 首次真实交互时补一次，且跳过小圆点自身（否则会进全屏又立刻退） |
 | 模板被误删后无法恢复 | 模板只存在于工作区，产物是唯一副本 | 产物自包含 ⇒ CSS / JS 可逐字反推，HTML 骨架可据 `generator.py` 的注入变量还原；见下节 |
-| 发布流水线挑错产物 | ① `actions/checkout` 把所有文件的 mtime 统一写成检出时刻，「取 mtime 最大」失效；② 一次重建会同时改动全部产物，提交时间平局，退化成按文件名排序 | 用 `git log -1 --format=%ct -- <path>` 比较提交时间并设 `fetch-depth: 0`；平局回落到对应 `content/*.md` 的提交时间；实现见 `pick_artifact.py` |
+| 发布流水线挑错产物 | ① `actions/checkout` 把所有文件的 mtime 统一写成检出时刻，「取 mtime 最大」失效；② 产物是渲染结果，一次重建会同时改写全部产物，其提交时间恒等于「最后一次重建」且彼此相同 —— 拿它当判据，每次都退化成按文件名排序 | 判据改用**书稿源** `content/*.md` 的提交时间（`git log -1 --format=%ct`）并设 `fetch-depth: 0`；实现见 `pick_artifact.py` |
 | `verify.py` 全绿，CI 却放行了失败 | 脚本原本只打印统计，从未设置退出码，恒返回 0 | 末尾补 `sys.exit(1 if FAIL else 0)` |
 | 排序靠后的产物从未被验证 | `verify.py` 写死 `_TARGETS[0]`，只测字典序第一个 | 支持命令行指定目标；CI 用 `for f in dist/*.html` 逐个覆盖 |
 | 私有仓库里找不到 Pages 开关 | 个人 Free 账号的 Pages 只支持公开仓库（分支保护接口返回 403 付费墙即同一限制） | 仓库转公开，或升级 Pro（站点仍公开） |
