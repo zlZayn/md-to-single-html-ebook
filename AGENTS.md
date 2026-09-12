@@ -32,7 +32,7 @@ gh workflow run publish.yml -f artifact=逆流.html              # 指定产物�
 - 产物：`the-lighthouse-keepers-cat.html` 86.5 KB / 10 章 / 34 页；`逆流.html` 107.0 KB / 12 章。
 - 自包含：外部资源 0 处。可复现：重编译后 `dist/` 逐字节无 diff。
 - 发布链路：push `main` 触发，三道闸门；首跑 build 1m10s / deploy 9s。
-- 链接校验 13 文件 / 26 链接 0 错误；换行 38 文件 0 不一致。
+- 链接校验 18 文件 / 62 链接 / 0 错误 0 警告；换行 30 文件 / 0 不一致。
 - 用例覆盖 → [tests/README.md](tests/README.md)
 
 ## 待办
