@@ -30,9 +30,9 @@
 ## 快速上手
 
 ```bash
-uv sync                                  # 按 uv.lock 重建环境（Python 3.12.10）
-uv run python generator.py               # 编译 content/ 下全部 .md
-uv run python generator.py content/xxx.md -o dist/book.html   # 编译指定文件
+uv sync                                      # 按 uv.lock 重建环境（Python 3.12.10）
+uv run python src/generator.py               # 编译 content/ 下全部 .md
+uv run python src/generator.py content/xxx.md -o dist/book.html   # 编译指定文件
 ```
 
 产物默认落在 `dist/<slug>.html`，双击即可阅读。
@@ -74,7 +74,7 @@ slug: file-name      # 可选，缺省取文件名（支持中文）
 
 欢迎提 Issue 与 PR。
 
-- 改代码前先看 [AGENTS.md](AGENTS.md) 的全局规则，改完必须跑 `verify.py`。
+- 改代码前先看 [AGENTS.md](AGENTS.md) 的全局规则，改完必须跑 `tests/verify.py`。
 - 设计与约束的理由见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 ---

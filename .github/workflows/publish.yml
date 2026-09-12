@@ -6,9 +6,8 @@ on:
     paths:
       - "content/**"
       - "templates/**"
-      - "generator.py"
-      - "pick_artifact.py"
-      - "verify.py"
+      - "src/**"
+      - "tests/**"
       - "pyproject.toml"
       - "uv.lock"
       - ".github/workflows/publish.yml"
@@ -53,7 +52,7 @@ jobs:
         run: uv run playwright install --with-deps chromium
 
       - name: 编译 content/ 全部
-        run: uv run python generator.py
+        run: uv run python src/generator.py
 
       - name: 校验产物与源码同步
         run: |
@@ -76,7 +75,7 @@ jobs:
       - name: 回归验证（逐个产物）
         run: |
           for f in dist/*.html; do
-            uv run python verify.py "$f"
+            uv run python tests/verify.py "$f"
           done
 
       - name: 挑出发布产物并生成站点入口
@@ -84,7 +83,7 @@ jobs:
         env:
           REQUESTED: ${{ github.event.inputs.artifact }}
         run: |
-          uv run python pick_artifact.py dist "$SITE_DIR" --requested "$REQUESTED"
+          uv run python src/pick_artifact.py dist "$SITE_DIR" --requested "$REQUESTED"
 
       - name: 上传 Pages 产物
         uses: actions/upload-pages-artifact@v3

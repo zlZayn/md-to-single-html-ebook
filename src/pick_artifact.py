@@ -31,11 +31,12 @@ import subprocess
 import sys
 from pathlib import Path
 
-# 复用生成器的同名规则：产物文件名怎么来，这里就怎么反查回书稿源，避免两处漂移。
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from generator import slugify  # noqa: E402
+# 同目录模块：复用生成器的命名规则，产物文件名怎么来就怎么反查回书稿源。
+# 以 uv run python src/pick_artifact.py 运行时，src/ 自动在 sys.path 上。
+from generator import slugify
 
-ROOT = Path(__file__).resolve().parent
+# 项目根：脚本位于 src/，根在其上一层；content/ 与 dist/ 都相对根定位。
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def last_commit_time(path: Path | None) -> int:

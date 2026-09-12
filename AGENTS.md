@@ -5,7 +5,7 @@
 机制与根因 → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 - 产物零外部依赖、字节可复现、以 bytes + LF 写出：三条都是硬契约。
-- 改完必跑 `verify.py`，只改 CSS 也要跑（分页对样式极敏感）。
+- 改完必跑 `tests/verify.py`，只改 CSS 也要跑（分页对样式极敏感）。
 - `column-width` 只用绝对长度，真实宽度由 JS 实测注入 `--col-w`。
 - `overflow: hidden` 只放 `#stage`，加到多列容器 `#book` 会让第 3 栏之后整片不显示。
 - JSON 注入绕过 autoescape；正文区点击只翻页；沉浸与全屏成对翻转。
@@ -15,15 +15,15 @@
 ## 常用命令
 
 ```bash
-uv sync                                                  # 按 uv.lock 重建环境
-uv run python generator.py                               # 编译 content/ 全部
-uv run python generator.py content/xxx.md -o dist/book.html   # 编译单个文件
-uv run python verify.py dist/逆流.html                    # 回归验证（需 chromium），可指定产物
-uv run python pick_artifact.py dist _site                # 试跑发布产物挑选
-uv run playwright install chromium                       # 首次安装浏览器
-grep -oE '(src|href)="https?://[^"]*"' dist/*.html        # 零外部依赖检查（应无输出）
-gh run watch                                             # 跟踪发布流水线
-gh workflow run publish.yml -f artifact=逆流.html         # 指定产物发布
+uv sync                                                       # 按 uv.lock 重建环境
+uv run python src/generator.py                                # 编译 content/ 全部
+uv run python src/generator.py content/xxx.md -o dist/book.html   # 编译单个文件
+uv run python tests/verify.py dist/逆流.html                   # 回归验证（需 chromium），可指定产物
+uv run python src/pick_artifact.py dist _site                 # 试跑发布产物挑选
+uv run playwright install chromium                            # 首次安装浏览器
+grep -oE '(src|href)="https?://[^"]*"' dist/*.html             # 零外部依赖检查（应无输出）
+gh run watch                                                  # 跟踪发布流水线
+gh workflow run publish.yml -f artifact=逆流.html              # 指定产物发布
 ```
 
 ## 验证快照（2026-09-12 实测）
@@ -33,7 +33,7 @@ gh workflow run publish.yml -f artifact=逆流.html         # 指定产物发布
 - 自包含：外部资源 0 处。可复现：重编译后 `dist/` 逐字节无 diff。
 - 发布链路：push `main` 触发，三道闸门；首跑 build 1m10s / deploy 9s。
 - 链接校验 13 文件 / 26 链接 0 错误；换行 38 文件 0 不一致。
-- 用例覆盖 → [verify.py](verify.py)
+- 用例覆盖 → [tests/README.md](tests/README.md)
 
 ## 待办
 
@@ -57,10 +57,9 @@ gh workflow run publish.yml -f artifact=逆流.html         # 指定产物发布
 - [README.md](README.md) — 门面：用途、能力、快速上手
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — 设计决策、约束、契约、防错清单、模板可恢复性
 - [docs/postmortem/](docs/postmortem/) — 事故复盘
+- [src/README.md](src/README.md) — 脚本手册；[src/AGENTS.md](src/AGENTS.md) — 脚本层约束
+- [tests/README.md](tests/README.md) — 回归覆盖范围与特殊坑；[tests/AGENTS.md](tests/AGENTS.md) — 断言约定
 - [templates/README.md](templates/README.md) — 模板职责与变更影响路由
 - [templates/AGENTS.md](templates/AGENTS.md) — 模板层约束
 - [.agents/notes/](.agents/notes/) — 决策记录
-- [generator.py](generator.py) — 解析与渲染管线
-- [verify.py](verify.py) — 回归用例
-- [pick_artifact.py](pick_artifact.py) — 发布产物挑选
 - [.github/workflows/publish.yml](.github/workflows/publish.yml) — 发布流水线

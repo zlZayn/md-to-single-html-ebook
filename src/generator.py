@@ -36,7 +36,8 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from markdown_it import MarkdownIt
 from markupsafe import Markup
 
-ROOT = Path(__file__).resolve().parent
+# 项目根：脚本位于 src/，根在其上一层；templates/ content/ dist/ 都相对根定位。
+ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE_DIR = ROOT / "templates"
 DEFAULT_CONTENT_DIR = ROOT / "content"
 DEFAULT_DIST_DIR = ROOT / "dist"

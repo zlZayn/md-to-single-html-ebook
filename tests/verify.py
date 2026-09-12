@@ -1,13 +1,15 @@
 """点击翻页 + 圆点右上角 + 抽屉排版 —— 回归验证。
 
-目标产物按脚本位置解析 dist/*.html，不写死路径。
+产物按项目根解析 dist/*.html，不写死路径。
 """
+
 import sys
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
-ROOT = Path(__file__).resolve().parent
+# 项目根：脚本位于 tests/，根在其上一层；产物在根下的 dist/。
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def resolve_target() -> Path:

@@ -26,7 +26,7 @@ Markdown 进，自包含单文件 HTML 出。
 
 ## 数据流
 
-`content/*.md` → `generator.py` → `dist/*.html`
+`content/*.md` → `src/generator.py` → `dist/*.html`
 
 1. 解析 front matter 与 `##` 章节
 2. markdown-it-py 渲染正文 HTML
@@ -40,7 +40,7 @@ Markdown 进，自包含单文件 HTML 出。
 
 - 站点：<https://zlzayn.github.io/md-to-single-html-ebook/>
 - workflow：`.github/workflows/publish.yml`
-- 触发范围：改动落在 `content/`、`templates/`、`generator.py`、`pick_artifact.py`、`verify.py`、`pyproject.toml`、`uv.lock` 或 workflow 自身。
+- 触发范围：改动落在 `content/`、`templates/`、`src/generator.py`、`src/pick_artifact.py`、`tests/verify.py`、`pyproject.toml`、`uv.lock` 或 workflow 自身。
 - 只改文档不触发发布。
 - 兜底入口：`workflow_dispatch`，可用 `artifact` 输入手动指定产物。
 
@@ -53,7 +53,7 @@ Markdown 进，自包含单文件 HTML 出。
 - 按产物时间选，每次都会退化到平局，与「哪一本最近在动」无关。
 - 只有书稿源的提交时间能反映维护者实际在写哪一本。
 
-优先级（实现见 `pick_artifact.py`）：
+优先级（实现见 `src/pick_artifact.py`）：
 
 1. **显式指定** —— `--requested <文件名>`，对应 `workflow_dispatch` 的 `artifact` 输入。
 2. **对应 `content/*.md` 的提交时间最大者**。
@@ -76,14 +76,14 @@ Markdown 进，自包含单文件 HTML 出。
 |---|---|---|
 | 产物与源码同步 | 重编译后 `git diff --exit-code -- dist/` 为空 | 产物与源码漂移，破坏「产物是模板唯一备份源」 |
 | 零外部依赖 | `grep -oE '(src\|href)="https?://[^"]*"' dist/*.html` 无命中 | 外链样式 / 脚本 / 字体混进产物，破坏离线能力 |
-| 全产物回归 | 对 `dist/*.html` **逐个**跑 `verify.py` | 阅读器行为回归 |
+| 全产物回归 | 对 `dist/*.html` **逐个**跑 `tests/verify.py` | 阅读器行为回归 |
 
 闸门只圈 `dist/`，本地因 uv 镜像配置改写 `uv.lock` 之类的噪声不会误触。
 
 ### 发布源是 CI 重编译的结果
 
 - 流水线不在云端提交任何东西。
-- `dist/` 始终由维护者本地重跑 `generator.py` 后提交。
+- `dist/` 始终由维护者本地重跑 `src/generator.py` 后提交。
 - 云端重编译只用于验证与发布，这依赖「产物字节可复现」这条约束。
 
 ### 站点公开性不可配置
@@ -200,20 +200,20 @@ epub.js、起点阅读页等成熟方案的共同做法。
 | 同字节产物在不同机器上页数不同 | Chromium 版本与系统字体度量差异 | 断言避免写死总页数，只断言相对变化 |
 | 按 Esc 退出全屏后停在无工具栏的空档 | 全屏被系统层面改动，工具栏状态没跟上 | 监听 `fullscreenchange`，全屏丢失且工具栏收起时自动展开并唤醒圆点 |
 | 默认沉浸态始终不进全屏 | 浏览器禁止无手势的全屏请求 | 首次真实交互时补一次，且跳过小圆点自身（否则会进全屏又立刻退） |
-| 模板被误删后无法恢复 | 模板只存在于工作区，产物是唯一副本 | 产物自包含 ⇒ CSS / JS 可逐字反推，HTML 骨架可据 `generator.py` 的注入变量还原；见下节 |
-| 发布流水线挑错产物 | ① `actions/checkout` 把所有文件的 mtime 统一写成检出时刻，「取 mtime 最大」失效；② 产物是渲染结果，一次重建会同时改写全部产物，其提交时间恒等于「最后一次重建」且彼此相同 —— 拿它当判据，每次都退化成按文件名排序 | 判据改用**书稿源** `content/*.md` 的提交时间（`git log -1 --format=%ct`）并设 `fetch-depth: 0`；实现见 `pick_artifact.py` |
-| `verify.py` 全绿，CI 却放行了失败 | 脚本原本只打印统计，从未设置退出码，恒返回 0 | 末尾补 `sys.exit(1 if FAIL else 0)` |
-| 排序靠后的产物从未被验证 | `verify.py` 写死 `_TARGETS[0]`，只测字典序第一个 | 支持命令行指定目标；CI 用 `for f in dist/*.html` 逐个覆盖 |
+| 模板被误删后无法恢复 | 模板只存在于工作区，产物是唯一副本 | 产物自包含 ⇒ CSS / JS 可逐字反推，HTML 骨架可据 `src/generator.py` 的注入变量还原；见下节 |
+| 发布流水线挑错产物 | ① `actions/checkout` 把所有文件的 mtime 统一写成检出时刻，「取 mtime 最大」失效；② 产物是渲染结果，一次重建会同时改写全部产物，其提交时间恒等于「最后一次重建」且彼此相同 —— 拿它当判据，每次都退化成按文件名排序 | 判据改用**书稿源** `content/*.md` 的提交时间（`git log -1 --format=%ct`）并设 `fetch-depth: 0`；实现见 `src/pick_artifact.py` |
+| `tests/verify.py` 全绿，CI 却放行了失败 | 脚本原本只打印统计，从未设置退出码，恒返回 0 | 末尾补 `sys.exit(1 if FAIL else 0)` |
+| 排序靠后的产物从未被验证 | `tests/verify.py` 写死 `_TARGETS[0]`，只测字典序第一个 | 支持命令行指定目标；CI 用 `for f in dist/*.html` 逐个覆盖 |
 | 私有仓库里找不到 Pages 开关 | 个人 Free 账号的 Pages 只支持公开仓库（分支保护接口返回 403 付费墙即同一限制） | 仓库转公开，或升级 Pro（站点仍公开） |
-| 断言只对某一本书成立 | `verify.py` 写死「目录 10 行」、跳章抽样 `[0, 3, 6, 9]`，隐含「书稿有 10 章」 | 书稿相关的量（章数、页数、词数）一律从 `#bookdata` 的结构化字段读取，或写成相对关系；模板层的规格常量（按钮数、分组数）具名提到文件顶部 |
+| 断言只对某一本书成立 | `tests/verify.py` 写死「目录 10 行」、跳章抽样 `[0, 3, 6, 9]`，隐含「书稿有 10 章」 | 书稿相关的量（章数、页数、词数）一律从 `#bookdata` 的结构化字段读取，或写成相对关系；模板层的规格常量（按钮数、分组数）具名提到文件顶部 |
 
 ## 契约
 
 - `dist/*.html` 不出现任何 `http(s)://` 的 `src` / `href`
 - 模板三份 `.j2` 编译期内联；只有 `reader.html.j2` 走 Jinja 渲染逻辑，改 CSS / JS 不需要懂 Jinja
 - 写产物一律写 bytes 并归一 LF
-- 任何改动后重跑 `verify.py`，产物必须零外部引用
-- `verify.py` 有失败项必须返回非零退出码
+- 任何改动后重跑 `tests/verify.py`，产物必须零外部引用
+- `tests/verify.py` 有失败项必须返回非零退出码
 - 断言不得写死与书稿相关的量：章数、页数、词数一律从产物自身读取或写成相对关系，否则断言只对某一本书成立
 - 发布前必须通过三道闸门：产物与源码同步、零外部依赖、全产物回归
 - 站点入口恒为 `index.html`，线上只保留一份产物
@@ -224,6 +224,6 @@ epub.js、起点阅读页等成熟方案的共同做法。
 
 - `reader.css.j2` = 产物 `<style>` 与 `</style>` 之间的内容
 - `reader.js.j2` = 产物最后一个 `<script>` 与 `</script>` 之间的内容
-- `reader.html.j2` = 产物去掉上述两块后的骨架，把渲染结果替换回 `generator.py` 注入的变量
+- `reader.html.j2` = 产物去掉上述两块后的骨架，把渲染结果替换回 `src/generator.py` 注入的变量
 
 判定还原是否精确的方法：用还原出的模板重建，与既有产物逐字节比对。相同即还原无损。
