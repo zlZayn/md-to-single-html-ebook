@@ -7,6 +7,7 @@ on:
       - "content/**"
       - "templates/**"
       - "generator.py"
+      - "pick_artifact.py"
       - "verify.py"
       - "pyproject.toml"
       - "uv.lock"
@@ -78,38 +79,12 @@ jobs:
             uv run python verify.py "$f"
           done
 
-      - name: 挑出发布产物
+      - name: 挑出发布产物并生成站点入口
         id: pick
         env:
           REQUESTED: ${{ github.event.inputs.artifact }}
         run: |
-          set -euo pipefail
-          mkdir -p "$SITE_DIR"
-
-          if [ -n "$REQUESTED" ]; then
-            target="dist/$REQUESTED"
-            if [ ! -f "$target" ]; then
-              echo "::error::指定的产物不存在：$target"
-              exit 1
-            fi
-            echo "手动指定产物：$target"
-          else
-            target=""
-            best=-1
-            for f in dist/*.html; do
-              t=$(git log -1 --format=%ct -- "$f")
-              t=${t:-0}
-              if [ "$t" -gt "$best" ]; then
-                best="$t"
-                target="$f"
-              fi
-            done
-            echo "按提交时间取最新产物：$target"
-          fi
-
-          cp "$target" "$SITE_DIR/index.html"
-          echo "artifact=$(basename "$target")" >> "$GITHUB_OUTPUT"
-          ls -l "$SITE_DIR"
+          uv run python pick_artifact.py dist "$SITE_DIR" --requested "$REQUESTED"
 
       - name: 上传 Pages 产物
         uses: actions/upload-pages-artifact@v3

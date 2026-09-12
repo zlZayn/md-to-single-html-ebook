@@ -15,6 +15,12 @@
 
 推到 `main` 后由 [.github/workflows/publish.yml](.github/workflows/publish.yml) 编译、回归、发布。站点入口固定为 `index.html`，永远指向**最近改动的那一本**。
 
+发布哪一本由 [pick_artifact.py](pick_artifact.py) 决定：先比产物的提交时间，平局时比 `content/*.md` 的提交时间。要指定：
+
+```bash
+gh workflow run publish.yml -f artifact=逆流.html
+```
+
 ## 特性
 
 - **编译**：一份 Markdown → 单个 `.html`，样式、脚本、正文全部内联
@@ -79,7 +85,8 @@ slug: file-name      # 可选，缺省取文件名（支持中文）
 
 ```
 ├── generator.py          # 编译入口：解析 Markdown → 渲染模板 → 输出单文件 HTML
-├── verify.py             # Playwright 回归测试（42 项），可指定验证哪一份产物
+├── verify.py             # Playwright 回归测试（43 项），可指定验证哪一份产物
+├── pick_artifact.py      # 发布时挑出最新产物，生成站点入口 index.html
 ├── content/              # 书稿源文件（.md）
 ├── dist/                 # 编译产物（.html）
 ├── templates/            # Jinja2 模板：reader.html.j2 / .css.j2 / .js.j2

@@ -19,19 +19,21 @@
 
 ## 关键决策
 
-### 「最新产物」按 git 提交时间判定，不用 mtime
+### 「最新产物」的判定，落在独立脚本里
 
-`actions/checkout` 会把所有文件的修改时间统一写成检出时刻，`dist/*.html` 的 mtime 在 CI 里全部相等 —— 「取 mtime 最大」在本地成立、在 CI 必然挑错。
-
-改用提交时间：
+`actions/checkout` 会把所有文件的修改时间统一写成检出时刻，`dist/*.html` 的 mtime 在 CI 里全部相等 —— 「取 mtime 最大」在本地成立、在 CI 必然挑错。改用提交时间：
 
 ```
 git log -1 --format=%ct -- <path>
 ```
 
-值来自真实 commit，与检出行为无关。代价是需要 `fetch-depth: 0`（浅克隆取不到完整历史）。
+代价是需要 `fetch-depth: 0`（浅克隆取不到完整历史）。
 
-平局（同一提交里改了两本）时按 `dist/*.html` 的字典序取第一个；要绕过自动判定时用 `workflow_dispatch` 的 `artifact` 输入直接指定。
+判定逻辑落在独立脚本 `pick_artifact.py`，而不是内联在 YAML 里 —— 这样能在本地实测，首跑前已验证三条路径：自动挑选、手动指定、指定不存在的文件报错退出 1。
+
+优先级：**显式指定 → 产物提交时间最大 → 平局时取对应 `content/*.md` 的提交时间最大 → 文件名升序**。
+
+第三级是首跑实测后才补上的，值得记一笔：首次发布就撞上平局（两本产物同属一个提交，时间完全相同）。此时若按文件名排序，线上永远是英文字典序靠前的那本，跟「最新」毫无关系。回落到源文件时间后，选中了维护者实际在写的《逆流》。产物到源文件的映射复用 `generator.slugify`，同一套命名规则不在两处各写一份。
 
 ### 产物以 `index.html` 发布
 
@@ -70,4 +72,6 @@ https://zlzayn.github.io/md-to-single-html-ebook/
 ## 验证方式
 
 - 本地：`uv run python generator.py` 后 `git diff --exit-code -- dist/` 为空 ⇒ 字节可复现成立，CI 闸门不会误伤。
-- 线上：push 后看 Actions 跑完 build 与 deploy，打开站点 URL 确认指向最新产物。
+- 本地：`uv run python pick_artifact.py dist _site` 三条路径实测通过（自动 / 手动 / 指定不存在）。
+- 本地：两份产物各 `uv run python verify.py <path>` 43/43 全绿、退出码 0。
+- 线上：push 后 Actions 跑完 build 与 deploy（首跑实测 build 1m10s / deploy 9s），打开站点 URL 确认指向最新产物。

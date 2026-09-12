@@ -43,15 +43,22 @@ Markdown 进，自包含单文件 HTML 出。
 - 触发范围：改动落在 `content/`、`templates/`、`generator.py`、`verify.py`、`pyproject.toml`、`uv.lock` 或 workflow 自身。只改文档不触发发布
 - 兜底入口：`workflow_dispatch`，可用 `artifact` 输入手动指定产物
 
-### 「最新产物」由 git 提交时间决定
+### 「最新产物」的判定
 
-`actions/checkout` 把所有文件的 mtime 统一写成检出时刻，`dist/*.html` 的 mtime 在 CI 里全部相等 —— 「取 mtime 最大」在本地成立、在 CI 必然挑错。因此改用
+`actions/checkout` 把所有文件的 mtime 统一写成检出时刻，`dist/*.html` 的 mtime 在 CI 里全部相等 —— 「取 mtime 最大」在本地成立、在 CI 必然挑错。因此改用提交时间：
 
 ```
 git log -1 --format=%ct -- <path>
 ```
 
-取提交时间最大者，并需要 `fetch-depth: 0`（浅克隆拿不到完整历史）。平局（同一提交里改了两本）按 `dist/*.html` 字典序取第一个。
+并需要 `fetch-depth: 0`（浅克隆拿不到完整历史）。判定优先级（实现见 `pick_artifact.py`）：
+
+1. **显式指定** —— `--requested <文件名>`，对应 `workflow_dispatch` 的 `artifact` 输入
+2. **产物自身的提交时间最大者**
+3. **平局时取对应 `content/*.md` 的提交时间最大者** —— 一次重建（改模板、CSS、生成器）会同时改动全部产物，平局在本仓库是**常态**，实测首次发布即撞上。源文件时间反映维护者实际在写哪一本，比文件名排序贴近意图
+4. **再平局按文件名升序**，保证结果确定
+
+产物到源文件的映射复用 `generator.slugify`，同一套命名规则不在两处各写一份。
 
 ### 站点入口固定为 `index.html`
 
@@ -182,7 +189,7 @@ epub.js、起点阅读页等成熟方案的共同做法。
 | 按 Esc 退出全屏后停在无工具栏的空档 | 全屏被系统层面改动，工具栏状态没跟上 | 监听 `fullscreenchange`，全屏丢失且工具栏收起时自动展开并唤醒圆点 |
 | 默认沉浸态始终不进全屏 | 浏览器禁止无手势的全屏请求 | 首次真实交互时补一次，且跳过小圆点自身（否则会进全屏又立刻退） |
 | 模板被误删后无法恢复 | 模板只存在于工作区，产物是唯一副本 | 产物自包含 ⇒ CSS / JS 可逐字反推，HTML 骨架可据 `generator.py` 的注入变量还原；见下节 |
-| 发布流水线挑错产物 | `actions/checkout` 把所有文件的 mtime 统一写成检出时刻，「取 mtime 最大」失效 | 改用 `git log -1 --format=%ct -- <path>` 比较提交时间，并设 `fetch-depth: 0` |
+| 发布流水线挑错产物 | ① `actions/checkout` 把所有文件的 mtime 统一写成检出时刻，「取 mtime 最大」失效；② 一次重建会同时改动全部产物，提交时间平局，退化成按文件名排序 | 用 `git log -1 --format=%ct -- <path>` 比较提交时间并设 `fetch-depth: 0`；平局回落到对应 `content/*.md` 的提交时间；实现见 `pick_artifact.py` |
 | `verify.py` 全绿，CI 却放行了失败 | 脚本原本只打印统计，从未设置退出码，恒返回 0 | 末尾补 `sys.exit(1 if FAIL else 0)` |
 | 排序靠后的产物从未被验证 | `verify.py` 写死 `_TARGETS[0]`，只测字典序第一个 | 支持命令行指定目标；CI 用 `for f in dist/*.html` 逐个覆盖 |
 | 私有仓库里找不到 Pages 开关 | 个人 Free 账号的 Pages 只支持公开仓库（分支保护接口返回 403 付费墙即同一限制） | 仓库转公开，或升级 Pro（站点仍公开） |
