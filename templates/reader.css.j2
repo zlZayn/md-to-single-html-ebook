@@ -27,7 +27,7 @@
   --page-width:  34rem;
   --pad-x:       1.35rem;
   --pad-y:       2.5rem;
-  --font-stack:  Georgia, "Times New Roman", "Songti SC", "Noto Serif SC", serif;
+  --font-stack:  Georgia, "Times New Roman", "Songti SC", "SimSun", "Noto Serif SC", "Source Han Serif SC", serif;
 
   /* UI 过渡 */
   --ease-out: cubic-bezier(.22, 1, .36, 1);
@@ -267,6 +267,66 @@ button {
   float: none;
   font-size: inherit;
   color: inherit;
+}
+
+/* ───────── 中文专用排版 ───────── */
+[lang="zh"] {
+  /* 中文更适合的默认行距 */
+  --line-height: 1.9;
+}
+
+[lang="zh"] .chapter-body p {
+  /* 中文段首缩进两字符 */
+  text-indent: 2em;
+  text-align: justify;
+  /* 中文标点悬挂：允许句末标点落在行尾 */
+  hanging-punctuation: allow-end;
+}
+
+[lang="zh"] .chapter-body > p:first-of-type {
+  text-indent: 2em;
+}
+
+/* 中文不用首字下沉：汉字是方块字，下沉后字形比例失调 */
+[lang="zh"][data-style="book"] .chapter-body > p:first-of-type::first-letter {
+  float: none;
+  font-size: inherit;
+  line-height: inherit;
+  padding: 0;
+  font-weight: inherit;
+  color: inherit;
+}
+
+/* 中文标题不用斜体：汉字斜体可读性差 */
+[lang="zh"][data-style="book"] .chapter-title {
+  font-style: normal;
+  font-weight: 600;
+}
+
+[lang="zh"] .chapter-num {
+  /* 中文章节序号用更紧凑的字距 */
+  letter-spacing: .2em;
+  text-indent: .2em;
+}
+
+[lang="zh"] .chapter-body blockquote {
+  /* 中文引用不用斜体 */
+  font-style: normal;
+}
+
+[lang="zh"] .chapter-body em {
+  /* 中文强调用着重号样式替代斜体（保持斜体但加底色提示） */
+  font-style: normal;
+  text-emphasis: filled dot;
+  -webkit-text-emphasis: filled dot;
+  text-emphasis-position: under;
+  -webkit-text-emphasis-position: under;
+}
+
+/* 中文书名号、引号等标点的断行优化 */
+[lang="zh"] .chapter-body {
+  line-break: strict;
+  -webkit-line-break: strict;
 }
 
 /* ══════════ 分页模式（CSS 多列） ══════════ */

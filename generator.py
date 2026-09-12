@@ -41,8 +41,10 @@ TEMPLATE_DIR = ROOT / "templates"
 DEFAULT_CONTENT_DIR = ROOT / "content"
 DEFAULT_DIST_DIR = ROOT / "dist"
 
-# 生成 dist 文件名 slug 时允许的字符
-SLUG_RE = re.compile(r"[^a-z0-9]+")
+# 生成 dist 文件名 slug 时允许的字符（保留中文）
+SLUG_RE = re.compile(r"[^a-z0-9\u4e00-\u9fff]+")
+# 检测中文字符
+CJK_RE = re.compile(r"[\u4e00-\u9fff]")
 
 
 # --------------------------------------------------------------------------- #
@@ -124,9 +126,14 @@ def slugify(value: str) -> str:
 
 
 def count_words(html: str) -> int:
-    """粗略统计词数：去掉标签后按空白切分。"""
+    """统计字数：中文按字符数，英文按空白分词数。"""
     text = re.sub(r"<[^>]+>", " ", html)
-    return len([w for w in text.split() if any(ch.isalnum() for ch in w)])
+    # 中文字符直接计数
+    cjk_count = len(CJK_RE.findall(text))
+    # 移除中文字符后，剩余按空白分词统计英文词
+    non_cjk = CJK_RE.sub(" ", text)
+    word_count = len([w for w in non_cjk.split() if any(ch.isalnum() for ch in w)])
+    return cjk_count + word_count
 
 
 def split_chapters(body: str, md: MarkdownIt) -> tuple[str, list[tuple[str, str]]]:
@@ -173,6 +180,13 @@ def split_chapters(body: str, md: MarkdownIt) -> tuple[str, list[tuple[str, str]
     return title, sections
 
 
+def detect_lang(text: str) -> str:
+    """根据正文内容自动检测语言：中文字符占比超 15% 视为中文。"""
+    cjk = len(CJK_RE.findall(text))
+    total = max(len(text.strip()), 1)
+    return "zh" if cjk / total > 0.15 else "en"
+
+
 def build_book(path: Path) -> Book:
     """读一个 md 文件，产出 Book 数据模型。"""
     raw = path.read_text(encoding="utf-8")
@@ -181,10 +195,12 @@ def build_book(path: Path) -> Book:
     md = make_renderer()
     title, sections = split_chapters(body, md)
 
+    # 语言：front-matter 显式指定 > 自动检测 > 默认 en
+    auto_lang = detect_lang(body)
     book = Book(
         title=meta.get("title") or title or path.stem,
         author=meta.get("author", ""),
-        lang=meta.get("lang", "en"),
+        lang=meta.get("lang") or auto_lang,
         slug=meta.get("slug") or slugify(path.stem),
         source=path.name,
     )
@@ -315,10 +331,11 @@ def main(argv: list[str] | None = None) -> int:
 
             book = compile_one(src, dst, env)
             size_kb = dst.stat().st_size / 1024
+            unit = "字" if book.lang == "zh" else "词"
             print(
                 f"[完成] {src.name} -> {dst}\n"
                 f"       书名: {book.title}\n"
-                f"       章节: {len(book.chapters)} 章 / {book.word_count} 词\n"
+                f"       章节: {len(book.chapters)} 章 / {book.word_count} {unit}\n"
                 f"       体积: {size_kb:.1f} KB（单文件，无外部依赖）"
             )
             ok += 1

@@ -23,11 +23,14 @@ uv run playwright install chromium                       # 首次安装浏览器
 grep -oE '(src|href)="https?://[^"]*"' dist/*.html        # 零外部依赖检查（应无输出）
 ```
 
-## 验证快照（2026-09-12 实测）
+## 验证快照（2026-09-12 实测 · 中文优化后）
 
 - **Playwright 回归：42 passed / 0 failed**（390×844，`is_mobile=true, has_touch=true`，Chromium 148.0.7778.96）
 - 覆盖：点击翻页与页码同步、中轴线左右分区（含中线归属与不弹菜单）、横滑不翻页、圆点位置与静默、翻页不唤醒圆点、沉浸与全屏成对翻转、首次手势补齐全屏、目录跳章 4/4、首页边界反馈、工具栏已无拖拉条、抽屉对齐（序号右边缘 / 标题左边缘 / 设置标签与控件左右边缘各自单值）、四机型（320/390/430/820）横向溢出 0px、全程零 JS 错误
-- **产物**：`dist/the-lighthouse-keepers-cat.html` = 85.0 KB，10 章 / 4238 词，34 页（390×844）
+- **产物**：
+  - `dist/the-lighthouse-keepers-cat.html` = 86.5 KB，10 章 / 4238 词，34 页（390×844），lang=en
+  - `dist/逆流.html` = 107.0 KB，12 章 / 11264 字，lang=zh
+- **中文支持**：slug 保留中文、字数按字符统计、lang 自动检测、`[lang="zh"]` 专属排版（禁首字下沉 / 禁斜体标题 / 段首两字符缩进 / 着重号强调 / 严格断行）
 - **自包含**：外部资源 0 处，外部脚本 0，外部样式表 0
 - **可复现**：同源码二次重建逐字节相同，CRLF 计数 0
 - **未验证项**：真实 iOS Safari / Android Chrome 上机（只有 Chromium）；`localStorage` 只在本机生效

@@ -36,7 +36,7 @@
       <footer class="book-end">
         <p class="end-mark">&#10086;</p>
         <p class="end-text">{{ book.title }} — 完</p>
-        <p class="end-hint">共 {{ book.chapters|length }} 章 · {{ book.word_count }} 词</p>
+        <p class="end-hint">共 {{ book.chapters|length }} 章 · {{ book.word_count }} {% if book.lang == 'zh' %}字{% else %}词{% endif %}</p>
       </footer>
     </article>
   </div>
@@ -74,7 +74,7 @@
   <div class="drawer-body">
     <div class="toc-meta">
       <p class="toc-book">{{ book.title }}</p>
-      <p class="toc-stat">{{ book.chapters|length }} 章 · 约 {{ book.word_count }} 词</p>
+      <p class="toc-stat">{{ book.chapters|length }} 章 · 约 {{ book.word_count }} {% if book.lang == 'zh' %}字{% else %}词{% endif %}</p>
     </div>
     <nav class="toc-list">
 {% for c in chapters %}
