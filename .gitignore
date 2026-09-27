@@ -10,6 +10,9 @@
 __pycache__/
 *.py[cod]
 
+# Lint / 格式化缓存
+.ruff_cache/
+
 # 虚拟环境
 .venv/
 venv/

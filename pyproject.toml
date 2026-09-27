@@ -12,7 +12,12 @@ dependencies = [
 [dependency-groups]
 dev = [
     "playwright>=1.40",
+    "ruff>=0.16.9",
 ]
 
 [tool.uv]
 package = false
+
+[tool.ruff]
+# 不碰 Markdown 里嵌的 Python 片段：文档与笔记正文不属格式化范围
+extend-exclude = ["*.md"]

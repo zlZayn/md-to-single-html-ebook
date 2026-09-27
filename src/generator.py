@@ -162,11 +162,10 @@ def split_chapters(body: str, md: MarkdownIt) -> tuple[str, list[tuple[str, str]
         buffer = []
 
     for line in lines:
-        if line.startswith("# ") and not line.startswith("## "):
-            # 一级标题即书名，不进入章节正文
-            if not title:
-                title = line[2:].strip()
-                continue
+        # 一级标题即书名，不进入章节正文
+        if line.startswith("# ") and not line.startswith("## ") and not title:
+            title = line[2:].strip()
+            continue
         if line.startswith("## "):
             flush()
             current_title = line[3:].strip()

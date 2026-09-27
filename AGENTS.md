@@ -16,6 +16,8 @@
 
 ```bash
 uv sync                                                       # 按 uv.lock 重建环境
+uv run ruff check .                                           # Lint（ruff 默认规则集）
+uv run ruff format .                                          # 格式化（--check 只看不改）
 uv run python src/generator.py                                # 编译 content/ 全部
 uv run python src/generator.py content/xxx.md -o dist/book.html   # 编译单个文件
 uv run python tests/verify.py dist/逆流.html                   # 回归验证（需 chromium），可指定产物
