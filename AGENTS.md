@@ -11,6 +11,7 @@
 - JSON 注入绕过 autoescape；正文区点击只翻页；沉浸与全屏成对翻转。
 - `dist/` 与 `content/` 永不加入 `.gitignore`：产物是模板的唯一备份源。
 - 发布产物必须与源码同步；发布哪一本看 `content/*.md` 的提交时间，不看产物。
+- 双件分离：AGENTS.md 只写规则，README.md 只写是什么/怎么改
 
 ## 常用命令
 
