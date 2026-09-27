@@ -39,8 +39,8 @@ OK, FAIL = [], []
 # 模板层的固定约定，与具体书稿无关。书稿相关的量（章数、页数、词数）一律
 # 从产物自身读取或写成相对关系，不许写死 —— 写死会让断言只对某一本书成立，
 # 换一本书就变成假绿或误报。
-TOOLBAR_BUTTONS = 2   # 工具栏按钮：目录 / 设置
-SETTING_GROUPS = 7    # 设置抽屉的分组数
+TOOLBAR_BUTTONS = 2  # 工具栏按钮：目录 / 设置
+SETTING_GROUPS = 7  # 设置抽屉的分组数
 
 
 def check(name, cond, extra=""):
@@ -83,12 +83,19 @@ def text_edges(page, selector):
 
 with sync_playwright() as pw:
     browser = pw.chromium.launch()
-    ctx = browser.new_context(viewport={"width": 390, "height": 844},
-                              is_mobile=True, has_touch=True, device_scale_factor=3)
+    ctx = browser.new_context(
+        viewport={"width": 390, "height": 844},
+        is_mobile=True,
+        has_touch=True,
+        device_scale_factor=3,
+    )
     page = ctx.new_page()
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
-    page.on("console", lambda m: errors.append("console:" + m.text) if m.type == "error" else None)
+    page.on(
+        "console",
+        lambda m: errors.append("console:" + m.text) if m.type == "error" else None,
+    )
     page.goto(URL)
     page.wait_for_timeout(1400)
 
@@ -98,15 +105,21 @@ with sync_playwright() as pw:
     check("无 JS 错误", not errors, str(errors[:2]))
     total = page.evaluate("window.__reader.paginator.total")
     check("分页已生成", total > 5, f"共 {total} 页")
-    check("页码可见", page.inner_text("#pageinfo").strip() != "",
-          page.inner_text("#pageinfo").strip())
+    check(
+        "页码可见",
+        page.inner_text("#pageinfo").strip() != "",
+        page.inner_text("#pageinfo").strip(),
+    )
 
     # 章数取自注入的结构化数据，不写死（英文书 10 章、中文书 12 章），
     # 也不去解析渲染后的中文文案 —— 文案格式一变正则就废。
     # 目录行数、跳章抽样、抽屉行数断言全部以它为基准。
     chapter_count = page.evaluate("window.__reader.book.chapterCount")
-    check("章数可读", isinstance(chapter_count, (int, float)) and chapter_count > 0,
-          f"{chapter_count} 章")
+    check(
+        "章数可读",
+        isinstance(chapter_count, (int, float)) and chapter_count > 0,
+        f"{chapter_count} 章",
+    )
     if not chapter_count:
         sys.exit("产物未声明章数（bookdata 缺失或格式变了），后续断言无法给出可信结论")
     chapter_count = int(chapter_count)
@@ -117,8 +130,11 @@ with sync_playwright() as pw:
     page.wait_for_timeout(520)
     p1 = page.evaluate("window.__reader.paginator.page")
     check("页码 +1", p1 == p0 + 1, f"{p0} → {p1}")
-    check("页码文本同步", page.inner_text("#pageinfo").strip().startswith(str(p1 + 1)),
-          page.inner_text("#pageinfo").strip())
+    check(
+        "页码文本同步",
+        page.inner_text("#pageinfo").strip().startswith(str(p1 + 1)),
+        page.inner_text("#pageinfo").strip(),
+    )
 
     print("\n【3】点击左侧 → 上一页")
     tap(page, W * 0.08, H * 0.5)
@@ -129,19 +145,23 @@ with sync_playwright() as pw:
     print("\n【4】中轴线分区：中部点击不再弹菜单")
     page.evaluate("window.__reader.ui.closeToolbar()")
     pb = page.evaluate("window.__reader.paginator.page")
-    tap(page, W * 0.5, H * 0.5)                # 正中线，归右半屏
+    tap(page, W * 0.5, H * 0.5)  # 正中线，归右半屏
     page.wait_for_timeout(520)
     pa = page.evaluate("window.__reader.paginator.page")
     check("正中线 = 下一页", pa == pb + 1, f"{pb} → {pa}")
-    check("中部点击不弹工具栏",
-          page.evaluate("document.body.dataset.toolbar") == "closed",
-          page.evaluate("document.body.dataset.toolbar"))
-    tap(page, W * 0.5 - 6, H * 0.5)            # 线左侧 6px，应回退
+    check(
+        "中部点击不弹工具栏",
+        page.evaluate("document.body.dataset.toolbar") == "closed",
+        page.evaluate("document.body.dataset.toolbar"),
+    )
+    tap(page, W * 0.5 - 6, H * 0.5)  # 线左侧 6px，应回退
     page.wait_for_timeout(520)
     pc = page.evaluate("window.__reader.paginator.page")
     check("线左侧 = 上一页", pc == pa - 1, f"{pa} → {pc}")
-    check("整屏无中间态热区",
-          page.evaluate("document.querySelectorAll('#tapzones, .tapzone').length") == 0)
+    check(
+        "整屏无中间态热区",
+        page.evaluate("document.querySelectorAll('#tapzones, .tapzone').length") == 0,
+    )
 
     print("\n【5】横向滑动不应翻页（拖拽已移除）")
     p3 = page.evaluate("window.__reader.paginator.page")
@@ -167,14 +187,17 @@ with sync_playwright() as pw:
     print("\n【6】小圆点位于右上角")
     box = page.locator("#immersiveToggle").bounding_box()
     right_gap = W - (box["x"] + box["width"])
-    check("水平靠右", box["x"] > W * 0.75,
-          f'x={box["x"]:.0f}, 右边距={right_gap:.0f}px')
-    check("垂直靠上", box["y"] < H * 0.15, f'y={box["y"]:.0f}px')
-    check("尺寸合理", 30 < box["width"] < 60, f'{box["width"]:.0f}×{box["height"]:.0f}')
+    check(
+        "水平靠右", box["x"] > W * 0.75, f"x={box['x']:.0f}, 右边距={right_gap:.0f}px"
+    )
+    check("垂直靠上", box["y"] < H * 0.15, f"y={box['y']:.0f}px")
+    check("尺寸合理", 30 < box["width"] < 60, f"{box['width']:.0f}×{box['height']:.0f}")
 
     print("\n【7】小圆点静默淡显")
-    page.wait_for_timeout(1900)          # 等首次提示的唤醒窗口过去
-    op = page.evaluate("getComputedStyle(document.querySelector('#immersiveToggle')).opacity")
+    page.wait_for_timeout(1900)  # 等首次提示的唤醒窗口过去
+    op = page.evaluate(
+        "getComputedStyle(document.querySelector('#immersiveToggle')).opacity"
+    )
     check("平时极淡", float(op) <= 0.35, f"opacity={op}")
 
     print("\n【8】点小圆点 → 展开 + 提示")
@@ -187,7 +210,9 @@ with sync_playwright() as pw:
     page.wait_for_timeout(2000)
     tap(page, W * 0.9, H * 0.5)
     page.wait_for_timeout(260)
-    awake = page.evaluate("document.querySelector('#immersiveToggle').classList.contains('is-awake')")
+    awake = page.evaluate(
+        "document.querySelector('#immersiveToggle').classList.contains('is-awake')"
+    )
     check("翻页后圆点保持静默", not awake)
 
     print("\n【8c】沉浸与全屏成对翻转")
@@ -211,18 +236,24 @@ with sync_playwright() as pw:
     }""")
     page.evaluate("window.__reader.ui.openToolbar()")
     page.evaluate("window.__fs = []")
-    page.evaluate("window.__reader.ui.toggleImmersive()")     # 展开 -> 沉浸
+    page.evaluate("window.__reader.ui.toggleImmersive()")  # 展开 -> 沉浸
     im = page.evaluate("({tb: document.body.dataset.toolbar, fs: window.__fs.slice()})")
-    check("沉浸 = 收起工具栏 + 进全屏",
-          im["tb"] == "closed" and im["fs"] == ["enter"], str(im))
+    check(
+        "沉浸 = 收起工具栏 + 进全屏",
+        im["tb"] == "closed" and im["fs"] == ["enter"],
+        str(im),
+    )
     page.evaluate("window.__fs = []")
-    page.evaluate("window.__reader.ui.toggleImmersive()")     # 沉浸 -> 展开
+    page.evaluate("window.__reader.ui.toggleImmersive()")  # 沉浸 -> 展开
     ex = page.evaluate("({tb: document.body.dataset.toolbar, fs: window.__fs.slice()})")
-    check("展开 = 显示工具栏 + 退全屏",
-          ex["tb"] == "open" and ex["fs"] == ["exit"], str(ex))
+    check(
+        "展开 = 显示工具栏 + 退全屏",
+        ex["tb"] == "open" and ex["fs"] == ["exit"],
+        str(ex),
+    )
 
     print("\n【8d】沉浸态下首次真实点击补齐全屏")
-    page.reload()                                             # 回到默认沉浸态，清掉 spy
+    page.reload()  # 回到默认沉浸态，清掉 spy
     page.wait_for_timeout(1500)
     page.evaluate("""() => {
         window.__fs = [];
@@ -230,13 +261,15 @@ with sync_playwright() as pw:
             window.__fs.push('enter'); return Promise.resolve();
         };
     }""")
-    page.mouse.click(W * 0.9, H * 0.5)                        # 真实输入才会产生 pointerdown
+    page.mouse.click(W * 0.9, H * 0.5)  # 真实输入才会产生 pointerdown
     page.wait_for_timeout(400)
     fs = page.evaluate("window.__fs.slice()")
     check("首次点击补进全屏", "enter" in fs, str(fs))
-    check("补全屏时工具栏仍收起",
-          page.evaluate("document.body.dataset.toolbar") == "closed",
-          page.evaluate("document.body.dataset.toolbar"))
+    check(
+        "补全屏时工具栏仍收起",
+        page.evaluate("document.body.dataset.toolbar") == "closed",
+        page.evaluate("document.body.dataset.toolbar"),
+    )
 
     print("\n【9】目录跳章仍准确")
     page.evaluate("window.__reader.ui.openDrawer('toc')")
@@ -260,13 +293,19 @@ with sync_playwright() as pw:
     page.wait_for_timeout(400)
     tap(page, W * 0.08, H * 0.5)
     page.wait_for_timeout(300)
-    check("首页不再往前 / 有提示",
-          page.evaluate("window.__reader.paginator.page") == 0
-          and page.evaluate("document.querySelector('#toast').classList.contains('is-open')"))
+    check(
+        "首页不再往前 / 有提示",
+        page.evaluate("window.__reader.paginator.page") == 0
+        and page.evaluate(
+            "document.querySelector('#toast').classList.contains('is-open')"
+        ),
+    )
 
     print("\n【11】夜间 + 沉浸截图状态")
     page.evaluate("window.__reader.settings.apply({theme:'night'})")
-    page.evaluate(f"window.__reader.paginator.goto({max(1, total // 3)})")   # 非首屏即可，不写死页码
+    page.evaluate(
+        f"window.__reader.paginator.goto({max(1, total // 3)})"
+    )  # 非首屏即可，不写死页码
     page.evaluate("window.__reader.ui.closeToolbar()")
     page.wait_for_timeout(600)
     check("沉浸式页码可见", page.inner_text("#pageinfo").strip() != "")
@@ -275,11 +314,21 @@ with sync_playwright() as pw:
     page.evaluate("window.__reader.settings.apply({theme:'day'})")
     page.evaluate("window.__reader.ui.openToolbar()")
     page.wait_for_timeout(400)
-    check("不再有拖拉条",
-          page.evaluate("document.querySelectorAll('#toolbar input, .tb-slider').length") == 0)
-    check(f"工具栏只剩 {TOOLBAR_BUTTONS} 个按钮",
-          page.evaluate("document.querySelectorAll('#toolbar .tb-btn').length") == TOOLBAR_BUTTONS,
-          str(page.evaluate("[...document.querySelectorAll('#toolbar .tb-btn')].map(b => b.textContent.trim())")))
+    check(
+        "不再有拖拉条",
+        page.evaluate("document.querySelectorAll('#toolbar input, .tb-slider').length")
+        == 0,
+    )
+    check(
+        f"工具栏只剩 {TOOLBAR_BUTTONS} 个按钮",
+        page.evaluate("document.querySelectorAll('#toolbar .tb-btn').length")
+        == TOOLBAR_BUTTONS,
+        str(
+            page.evaluate(
+                "[...document.querySelectorAll('#toolbar .tb-btn')].map(b => b.textContent.trim())"
+            )
+        ),
+    )
 
     print("\n【13】抽屉排版成栅格")
     page.evaluate("window.__reader.ui.openDrawer('toc')")
@@ -287,15 +336,21 @@ with sync_playwright() as pw:
     nums = text_edges(page, ".toc-num")
     titles = text_edges(page, ".toc-title")
     # 与产物自身声明的章数比对，不写死：英文书 10 章、中文书 12 章。
-    check("目录行数 = 声明章数",
-          len(nums) == chapter_count and len(titles) == chapter_count,
-          f"{len(nums)} 行 / 声明 {chapter_count} 章")
-    check("序号右边缘对齐",
-          len({n["right"] for n in nums}) == 1,
-          str(sorted({n["right"] for n in nums})))
-    check("标题左边缘对齐",
-          len({t["left"] for t in titles}) == 1,
-          str(sorted({t["left"] for t in titles})))
+    check(
+        "目录行数 = 声明章数",
+        len(nums) == chapter_count and len(titles) == chapter_count,
+        f"{len(nums)} 行 / 声明 {chapter_count} 章",
+    )
+    check(
+        "序号右边缘对齐",
+        len({n["right"] for n in nums}) == 1,
+        str(sorted({n["right"] for n in nums})),
+    )
+    check(
+        "标题左边缘对齐",
+        len({t["left"] for t in titles}) == 1,
+        str(sorted({t["left"] for t in titles})),
+    )
 
     page.evaluate("window.__reader.ui.openDrawer('settings')")
     page.wait_for_timeout(450)
@@ -309,17 +364,25 @@ with sync_playwright() as pw:
             right: [...new Set(rows.map(r => round(r.children[1].getBoundingClientRect().right)))],
         };
     }""")
-    check(f"设置 {SETTING_GROUPS} 组", grid["rows"] == SETTING_GROUPS, str(grid["rows"]))
+    check(
+        f"设置 {SETTING_GROUPS} 组", grid["rows"] == SETTING_GROUPS, str(grid["rows"])
+    )
     check("标签左边缘同线", len(grid["label"]) == 1, str(grid["label"]))
     check("控件左边缘同线", len(grid["ctrl"]) == 1, str(grid["ctrl"]))
     check("控件右边缘同线", len(grid["right"]) == 1, str(grid["right"]))
     page.evaluate("window.__reader.ui.closeDrawers()")
 
     print("\n【14】多机型无溢出")
-    page.evaluate("document.exitFullscreen && document.fullscreenElement && document.exitFullscreen()")
+    page.evaluate(
+        "document.exitFullscreen && document.fullscreenElement && document.exitFullscreen()"
+    )
     page.wait_for_timeout(300)
-    for w, h, label in [(320, 568, "iPhone SE"), (390, 844, "iPhone 14"),
-                        (430, 932, "iPhone Pro Max"), (820, 1180, "iPad")]:
+    for w, h, label in [
+        (320, 568, "iPhone SE"),
+        (390, 844, "iPhone 14"),
+        (430, 932, "iPhone Pro Max"),
+        (820, 1180, "iPad"),
+    ]:
         page.set_viewport_size({"width": w, "height": h})
         page.wait_for_timeout(700)
         ov = page.evaluate("""() => {
@@ -333,11 +396,16 @@ with sync_playwright() as pw:
             };
         }""")
         dot = page.locator("#immersiveToggle").bounding_box()
-        check(f"{label} {w}×{h} 页面无横向溢出",
-              ov["docX"] <= 0 and ov["bodyX"] <= 0,
-              f'doc={ov["docX"]} body={ov["bodyX"]} 共{ov["total"]}页')
-        check(f"{label} 圆点在右上", dot["x"] > w * 0.75 and dot["y"] < h * 0.15,
-              f'x={dot["x"]:.0f} y={dot["y"]:.0f}')
+        check(
+            f"{label} {w}×{h} 页面无横向溢出",
+            ov["docX"] <= 0 and ov["bodyX"] <= 0,
+            f"doc={ov['docX']} body={ov['bodyX']} 共{ov['total']}页",
+        )
+        check(
+            f"{label} 圆点在右上",
+            dot["x"] > w * 0.75 and dot["y"] < h * 0.15,
+            f"x={dot['x']:.0f} y={dot['y']:.0f}",
+        )
 
     check("全程无 JS 错误", not errors, str(errors[:3]))
 

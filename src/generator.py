@@ -255,7 +255,9 @@ def render_book(book: Book, env: Environment) -> str:
     ]
 
     # 给 JS 用的纯数据（不含 HTML），一并以 JSON 注入
-    toc = [{"index": c.index, "title": c.title, "anchor": c.anchor} for c in book.chapters]
+    toc = [
+        {"index": c.index, "title": c.title, "anchor": c.anchor} for c in book.chapters
+    ]
     payload = {
         "title": book.title,
         "author": book.author,
@@ -275,7 +277,12 @@ def render_book(book: Book, env: Environment) -> str:
         # 必须用 Markup 关掉 autoescape：否则引号会被转成 &quot; / &#34;，
         # 导致浏览器 JSON.parse 直接失败。JSON 本身已由 json.dumps 保证安全，
         # 再把 < > & 转成 \uXXXX 形式即可杜绝 </script> 逃逸。
-        payload_json=Markup(json.dumps(payload, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")),
+        payload_json=Markup(
+            json.dumps(payload, ensure_ascii=False)
+            .replace("<", "\\u003c")
+            .replace(">", "\\u003e")
+            .replace("&", "\\u0026")
+        ),
         css=Markup(css),
         js=Markup(js),
     )
@@ -298,7 +305,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="把 Markdown 小说编译成自包含的单文件 HTML 电子书",
     )
-    parser.add_argument("inputs", nargs="*", help="要编译的 md 文件，缺省编译 content/ 全部")
+    parser.add_argument(
+        "inputs", nargs="*", help="要编译的 md 文件，缺省编译 content/ 全部"
+    )
     parser.add_argument("-o", "--output", help="输出 html 路径（仅单个输入时有效）")
     parser.add_argument("--all", action="store_true", help="编译 content/ 下全部 md")
     parser.add_argument(

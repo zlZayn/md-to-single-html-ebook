@@ -22,6 +22,7 @@ URL 编码（逆流.html → %E9%80%86%E6%B5%81.html）。
     uv run python pick_artifact.py dist _site
     uv run python pick_artifact.py dist _site --requested 逆流.html
 """
+
 from __future__ import annotations
 
 import argparse
@@ -46,7 +47,10 @@ def last_commit_time(path: Path | None) -> int:
     try:
         done = subprocess.run(
             ["git", "log", "-1", "--format=%ct", "--", str(path)],
-            cwd=ROOT, capture_output=True, text=True, check=True,
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
         )
     except subprocess.CalledProcessError:
         return 0
@@ -96,11 +100,19 @@ def pick(dist_dir: Path, content_dir: Path, requested: str | None) -> tuple[Path
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="挑出要发布的那一本并生成站点入口 index.html")
+    parser = argparse.ArgumentParser(
+        description="挑出要发布的那一本并生成站点入口 index.html"
+    )
     parser.add_argument("dist", type=Path, help="产物目录，如 dist")
-    parser.add_argument("site", type=Path, help="站点目录，选中产物会写成其中的 index.html")
-    parser.add_argument("--requested", default="", help="指定要发布的产物文件名（含 .html）")
-    parser.add_argument("--content", type=Path, default=None, help="书稿目录，默认 <dist>/../content")
+    parser.add_argument(
+        "site", type=Path, help="站点目录，选中产物会写成其中的 index.html"
+    )
+    parser.add_argument(
+        "--requested", default="", help="指定要发布的产物文件名（含 .html）"
+    )
+    parser.add_argument(
+        "--content", type=Path, default=None, help="书稿目录，默认 <dist>/../content"
+    )
     args = parser.parse_args(argv)
 
     dist_dir = args.dist.resolve()
