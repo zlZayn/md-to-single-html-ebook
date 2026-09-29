@@ -15,6 +15,8 @@
 
 ## 常用命令
 
+- 本地钩子：`pre-commit install`（每个 clone 一次；本体 `uv tool install pre-commit`）——提交前自动 `ruff check --fix` + `ruff format`；CI 只读跑同一组检查（产物闸仍在 publish.yml）
+
 ```bash
 uv sync                                                       # 按 uv.lock 重建环境
 uv run ruff check .                                           # Lint（ruff 默认规则集）

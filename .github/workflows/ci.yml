@@ -1,0 +1,40 @@
+# CI —— 只读质检：不写回仓库，不做任何发布动作。
+#
+# 与 publish.yml 的分工（两者互不干扰，本文件不碰发布链）：
+#   - publish.yml：产物闸（dist/ 与 content/ 逐字节同步 + 零外部依赖 + 逐个产物回归）→ 部署 Pages
+#   - 本文件：源码闸（ruff lint + 格式），在 push / PR 时就拦，不必等到产物被生成
+#
+# 为什么不跑 pytest：本仓 [dependency-groups] dev 里**没有 pytest**，
+# tests/ 里也只有 verify.py（脚本，不是 pytest 用例）。补 pytest 需要新增依赖 + 写用例，
+# 属另一件事，本文件不擅自引入。
+#
+# 判据单一来源：Ruff 版本来自 pyproject.toml 的 dev 组，锁在 uv.lock。
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Ruff
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies (frozen)
+        run: uv sync --frozen --group dev
+
+      - name: Ruff check
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
