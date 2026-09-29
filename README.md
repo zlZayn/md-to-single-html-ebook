@@ -80,21 +80,3 @@ slug: file-name      # 可选，缺省取文件名（支持中文）
 ---
 
 维护者文档地图见 [AGENTS.md](AGENTS.md)。
-
----
-
-## 本地提交钩子（pre-commit）
-
-提交前自动修复格式与 lint（只跑秒级检查；产物闸与回归验证仍在 [publish.yml](.github/workflows/publish.yml)）。
-前提：需要 uv 与 pre-commit（pre-commit 用 `uv tool install pre-commit` 装到 `~/.local/bin`）。
-
-```bash
-uv tool install pre-commit
-pre-commit install
-```
-
-> 装完需重开终端（或重载 shell 配置），PATH 才生效。
-
-- 手动全量跑：`pre-commit run --all-files`
-- 跳过单次：`git commit --no-verify`
-- 定义：[.pre-commit-config.yaml](.pre-commit-config.yaml)（CI 与钩子跑的是同一份 ruff 配置）
