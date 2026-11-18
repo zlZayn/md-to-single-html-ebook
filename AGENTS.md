@@ -52,7 +52,7 @@ gh workflow run publish.yml -f artifact=逆流.html              # 指定产物�
 - 页数绑定 Chromium 版本与系统字体度量 → 断言只写相对变化，不写死页数。
 - CI 里 mtime 全是检出时刻；产物提交时间恒等于「最后一次重建」→ 判据只看 `content/*.md`。
 - 私有仓库开不了 Pages（个人 Free 账号）；站点级访问控制只有 Enterprise Cloud 组织提供。
-- 本地 `uv run` 会整篇改写 `uv.lock`，提交前 `git restore uv.lock`。
+- ~~本地 `uv run` 会整篇改写 `uv.lock`，提交前 `git restore uv.lock`。~~ 已被 pyproject 的 `[[tool.uv.index]]` 修因（2026-11-18），实测 `uv run` 前后锁哈希一致；改为「改依赖后确认 uv.lock 无 `tsinghua` 字样」，见 [.agents/notes/2026-11-18-uv-lock-official-index.md](.agents/notes/2026-11-18-uv-lock-official-index.md)。
 - 整理历史禁用 `checkout` / `rebase`，只用 `git reset --soft|--mixed` + `add` + `commit`。
 - 本机 shell shim 无 coreutils（`ls` / `cp` / `rm` / `tail` / `grep` 不可用）→ 文件操作走编辑工具，别依赖 shell。
 - 新增任何写文件的地方都要守 LF。
